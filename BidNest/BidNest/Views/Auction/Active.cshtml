@@ -29,16 +29,25 @@
                             {
                                 <div class="col-lg-4 col-md-6 mb-4">
                                     <div class="card h-100 auction-card">
-                                        @if (!string.IsNullOrEmpty(auction.ItemImageUrl))
-                                        {
-                                            <img src="@auction.ItemImageUrl" class="card-img-top auction-image" alt="@auction.ItemName">
-                                        }
-                                        else
-                                        {
-                                            <div class="card-img-top auction-image bg-light d-flex align-items-center justify-content-center">
-                                                <i class="bx bx-image text-muted" style="font-size: 3rem;"></i>
-                                            </div>
-                                        }
+                                        <div class="position-relative">
+                                            @if (!string.IsNullOrEmpty(auction.ItemImageUrl))
+                                            {
+                                                <img src="@auction.ItemImageUrl" class="card-img-top auction-image" alt="@auction.ItemName">
+                                            }
+                                            else
+                                            {
+                                                <div class="card-img-top auction-image bg-light d-flex align-items-center justify-content-center">
+                                                    <i class="bx bx-image text-muted" style="font-size: 3rem;"></i>
+                                                </div>
+                                            }
+                                            @if (User.Identity?.IsAuthenticated == true)
+                                            {
+                                                <button class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 watchlist-btn" 
+                                                        data-item-id="@auction.ItemId" title="Add to Watchlist">
+                                                    <i class="fas fa-heart"></i>
+                                                </button>
+                                            }
+                                        </div>
 
                                         <div class="card-body d-flex flex-column">
                                             <h5 class="card-title">@auction.ItemName</h5>
@@ -139,6 +148,77 @@
 
 @section Scripts {
     <script>
+        // Watchlist functionality
+        $(document).ready(function() {
+            $('.watchlist-btn').click(function() {
+                var button = $(this);
+                var itemId = button.data('item-id');
+                var icon = button.find('i');
+                
+                button.prop('disabled', true);
+                
+                $.post('@Url.Action("ToggleWatchlist", "Buyer")', {
+                    itemId: itemId,
+                    __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                }).done(function(response) {
+                    if (response.success) {
+                        if (response.isInWatchlist) {
+                            icon.removeClass('far').addClass('fas');
+                            button.attr('title', 'Remove from Watchlist');
+                            showNotification('Item added to your watchlist!', 'success');
+                        } else {
+                            icon.removeClass('fas').addClass('far');
+                            button.attr('title', 'Add to Watchlist');
+                            showNotification('Item removed from your watchlist!', 'info');
+                        }
+                    } else {
+                        showNotification(response.message || 'An error occurred', 'error');
+                    }
+                }).fail(function() {
+                    showNotification('An error occurred. Please try again.', 'error');
+                }).always(function() {
+                    button.prop('disabled', false);
+                });
+            });
+            
+            // Check which items are already in watchlist
+            $('.watchlist-btn').each(function() {
+                var button = $(this);
+                var itemId = button.data('item-id');
+                
+                $.get('@Url.Action("IsInWatchlist", "Buyer")', {
+                    itemId: itemId
+                }).done(function(response) {
+                    if (response.isInWatchlist) {
+                        button.find('i').removeClass('far').addClass('fas');
+                        button.attr('title', 'Remove from Watchlist');
+                    } else {
+                        button.find('i').removeClass('fas').addClass('far');
+                    }
+                });
+            });
+        });
+        
+        // Show notification
+        function showNotification(message, type) {
+            var alertClass = 'alert-info';
+            if (type === 'success') alertClass = 'alert-success';
+            else if (type === 'error') alertClass = 'alert-danger';
+            
+            var notification = $('<div class="alert ' + alertClass + ' alert-dismissible fade show position-fixed top-0 end-0 m-3" style="z-index: 9999;">' +
+                '<i class="fas fa-info-circle me-2"></i>' + message +
+                '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                '</div>');
+            
+            $('body').append(notification);
+            
+            setTimeout(function() {
+                notification.fadeOut(function() {
+                    notification.remove();
+                });
+            }, 3000);
+        }
+        
         // Update all auction timers
         function updateAllTimers() {
             document.querySelectorAll('.auction-timer').forEach(timer => {

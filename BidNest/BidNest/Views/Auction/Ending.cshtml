@@ -1,0 +1,279 @@
+@model List<BidNest.ViewModels.AuctionStatusViewModel>
+@{
+    ViewData["Title"] = "Auctions Ending Soon";
+}
+
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="bx bx-alarm text-warning"></i> Auctions Ending Soon
+                    </h4>
+                    <div>
+                        <a href="@Url.Action("Active")" class="btn btn-primary btn-sm">
+                            <i class="bx bx-time"></i> Active Auctions
+                        </a>
+                        <a href="@Url.Action("Completed")" class="btn btn-outline-secondary btn-sm">
+                            <i class="bx bx-history"></i> Completed
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    @if (Model != null && Model.Any())
+                    {
+                        <div class="alert alert-warning mb-4">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Hurry!</strong> These auctions are ending within the next 24 hours!
+                        </div>
+
+                        <div class="row">
+                            @foreach (var auction in Model)
+                            {
+                                <div class="col-lg-4 col-md-6 mb-4">
+                                    <div class="card h-100 auction-card border-warning">
+                                        <div class="position-relative">
+                                            @if (!string.IsNullOrEmpty(auction.ItemImageUrl))
+                                            {
+                                                <img src="@auction.ItemImageUrl" class="card-img-top auction-image" alt="@auction.ItemName">
+                                            }
+                                            else
+                                            {
+                                                <div class="card-img-top auction-image bg-light d-flex align-items-center justify-content-center">
+                                                    <i class="bx bx-image text-muted" style="font-size: 3rem;"></i>
+                                                </div>
+                                            }
+                                            @if (User.Identity?.IsAuthenticated == true)
+                                            {
+                                                <button class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 watchlist-btn" 
+                                                        data-item-id="@auction.ItemId" title="Add to Watchlist">
+                                                    <i class="fas fa-heart"></i>
+                                                </button>
+                                            }
+                                            <div class="position-absolute top-0 start-0 m-2">
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="bx bx-alarm"></i> Ending Soon
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="card-body d-flex flex-column">
+                                            <h5 class="card-title">@auction.ItemName</h5>
+                                            
+                                            <!-- Auction Status -->
+                                            <div class="mb-3">
+                                                <span class="badge @auction.StatusBadgeClass">@auction.StatusDisplay</span>
+                                                @if (auction.TimeRemaining.TotalHours < 1)
+                                                {
+                                                    <span class="badge bg-danger ms-1">
+                                                        <i class="bx bx-time-five"></i> Final Hour!
+                                                    </span>
+                                                }
+                                            </div>
+
+                                            <!-- Current Bid -->
+                                            <div class="row mb-3">
+                                                <div class="col-6">
+                                                    <small class="text-muted">Current Bid</small>
+                                                    <div class="fw-bold text-success">
+                                                        $@((auction.CurrentHighestBid ?? auction.MinimumBid).ToString("N2"))
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted">Bids</small>
+                                                    <div class="fw-bold">@auction.TotalBids</div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Time Remaining (Prominent) -->
+                                            <div class="mb-3 text-center bg-warning bg-opacity-10 rounded p-2">
+                                                <small class="text-muted">Ending In</small>
+                                                <div class="fw-bold text-danger fs-5 auction-timer" data-end-time="@auction.EndTime.ToString("yyyy-MM-ddTHH:mm:ssZ")">
+                                                    @auction.TimeRemainingDisplay
+                                                </div>
+                                            </div>
+
+                                            <!-- Current Winner -->
+                                            @if (!string.IsNullOrEmpty(auction.CurrentWinnerName))
+                                            {
+                                                <div class="mb-3">
+                                                    <small class="text-muted">Current Leader</small>
+                                                    <div class="fw-medium">
+                                                        <i class="bx bx-crown text-warning"></i> @auction.CurrentWinnerName
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            <!-- Action Buttons -->
+                                            <div class="mt-auto">
+                                                <div class="d-grid gap-2">
+                                                    <a href="@Url.Action("Details", new { id = auction.ItemId })" class="btn btn-warning">
+                                                        <i class="bx bx-show"></i> View & Bid Now
+                                                    </a>
+                                                    @if (User.Identity?.IsAuthenticated == true)
+                                                    {
+                                                        <a href="@Url.Action("Bid", new { id = auction.ItemId })" class="btn btn-danger">
+                                                            <i class="bx bx-gavel"></i> Quick Bid
+                                                        </a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <a href="@Url.Action("Login", "Account")" class="btn btn-outline-danger">
+                                                            <i class="bx bx-user"></i> Login to Bid
+                                                        </a>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bx bx-alarm text-muted" style="font-size: 4rem;"></i>
+                            <h5 class="mt-3">No Auctions Ending Soon</h5>
+                            <p class="text-muted">There are currently no auctions ending within the next 24 hours.</p>
+                            <a href="@Url.Action("Active")" class="btn btn-primary mt-3">
+                                <i class="bx bx-search"></i> Browse Active Auctions
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auction-card {
+        transition: transform 0.2s;
+    }
+    .auction-card:hover {
+        transform: translateY(-5px);
+    }
+    .auction-image {
+        height: 200px;
+        object-fit: cover;
+    }
+    .auction-card.border-warning {
+        border-width: 2px !important;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        // Watchlist functionality
+        $(document).ready(function() {
+            $('.watchlist-btn').click(function() {
+                var button = $(this);
+                var itemId = button.data('item-id');
+                var icon = button.find('i');
+                
+                button.prop('disabled', true);
+                
+                $.post('@Url.Action("ToggleWatchlist", "Buyer")', {
+                    itemId: itemId,
+                    __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                }).done(function(response) {
+                    if (response.success) {
+                        if (response.isInWatchlist) {
+                            icon.removeClass('far').addClass('fas');
+                            button.attr('title', 'Remove from Watchlist');
+                            showNotification('Item added to your watchlist!', 'success');
+                        } else {
+                            icon.removeClass('fas').addClass('far');
+                            button.attr('title', 'Add to Watchlist');
+                            showNotification('Item removed from your watchlist!', 'info');
+                        }
+                    } else {
+                        showNotification(response.message || 'An error occurred', 'error');
+                    }
+                }).fail(function() {
+                    showNotification('An error occurred. Please try again.', 'error');
+                }).always(function() {
+                    button.prop('disabled', false);
+                });
+            });
+            
+            // Check which items are already in watchlist
+            $('.watchlist-btn').each(function() {
+                var button = $(this);
+                var itemId = button.data('item-id');
+                
+                $.get('@Url.Action("IsInWatchlist", "Buyer")', {
+                    itemId: itemId
+                }).done(function(response) {
+                    if (response.isInWatchlist) {
+                        button.find('i').removeClass('far').addClass('fas');
+                        button.attr('title', 'Remove from Watchlist');
+                    } else {
+                        button.find('i').removeClass('fas').addClass('far');
+                    }
+                });
+            });
+        });
+        
+        // Show notification
+        function showNotification(message, type) {
+            var alertClass = 'alert-info';
+            if (type === 'success') alertClass = 'alert-success';
+            else if (type === 'error') alertClass = 'alert-danger';
+            
+            var notification = $('<div class="alert ' + alertClass + ' alert-dismissible fade show position-fixed top-0 end-0 m-3" style="z-index: 9999;">' +
+                '<i class="fas fa-info-circle me-2"></i>' + message +
+                '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                '</div>');
+            
+            $('body').append(notification);
+            
+            setTimeout(function() {
+                notification.fadeOut(function() {
+                    notification.remove();
+                });
+            }, 3000);
+        }
+        
+        // Update all auction timers
+        function updateAllTimers() {
+            document.querySelectorAll('.auction-timer').forEach(timer => {
+                const endTime = new Date(timer.getAttribute('data-end-time'));
+                const now = new Date();
+                const timeLeft = endTime - now;
+                
+                if (timeLeft <= 0) {
+                    timer.innerHTML = '<span class="text-danger">Ended</span>';
+                    timer.closest('.auction-card').classList.add('opacity-75');
+                } else {
+                    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                    
+                    let display = '';
+                    if (hours > 0) {
+                        display = `${hours}h ${minutes}m`;
+                    } else if (minutes > 0) {
+                        display = `${minutes}m ${seconds}s`;
+                    } else {
+                        display = `${seconds}s`;
+                    }
+                    
+                    timer.innerHTML = display;
+                    
+                    // Add urgency styling
+                    if (hours === 0 && minutes < 30) {
+                        timer.classList.add('text-danger', 'fw-bold');
+                    }
+                }
+            });
+        }
+        
+        // Update timers every second
+        setInterval(updateAllTimers, 1000);
+        updateAllTimers(); // Initial call
+    </script>
+}
