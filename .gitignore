@@ -1,0 +1,30 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+*.cache
+
+# Visual Studio / IDE
+.vs/
+.vscode/
+.idea/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+secrets.json
+
+# Node (overhaul and landing page)
+node_modules/
+/dist/
+/*/dist/
+.next/
+.turbo/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
