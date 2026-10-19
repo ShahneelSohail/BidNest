@@ -259,6 +259,15 @@ describe('admin messages', () => {
     expect(await prisma.notification.count({ where: { userId: user.id, title: 'We replied to your message' } })).toBe(1);
   });
 
+  it('replies to a visitor message without trying to notify an account', async () => {
+    const admin = await adminAgent();
+    const message = await prisma.contactMessage.create({ data: { name: 'Guest', email: 'guest@example.com', subject: 'Website enquiry', message: 'How do I list an item?' } });
+
+    const res = await admin.post(`/api/admin/messages/${message.id}/reply`).send({ replyContent: 'Sign up and use Sell.' }).expect(200);
+    expect(res.body.data).toMatchObject({ status: 'replied', userId: null });
+    expect(await prisma.notification.count()).toBe(0);
+  });
+
   it('filters by status, updates, bulk-updates and deletes', async () => {
     const admin = await adminAgent();
     const a = await makeMessage();

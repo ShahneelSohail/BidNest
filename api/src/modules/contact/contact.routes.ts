@@ -24,7 +24,23 @@ const contactLimiter = rateLimit({
   message: { error: { message: 'Too many messages. Please try again later.' } },
 });
 
+const publicContactSchema = z.object({
+  name: z.string().trim().min(1, 'Your name is required').max(100, 'Name cannot exceed 100 characters'),
+  email: z.string().trim().toLowerCase().email('Invalid email format').max(255),
+  message: z.string().trim().min(10, 'Message must be at least 10 characters long').max(2000, 'Message cannot exceed 2000 characters'),
+});
+
 export const contactRouter = Router();
+
+contactRouter.post(
+  '/public',
+  contactLimiter,
+  validate('body', publicContactSchema),
+  asyncHandler(async (req, res) => {
+    const created = await prisma.contactMessage.create({ data: { ...req.body, subject: 'Website enquiry' } });
+    res.status(201).json({ data: { id: created.id } });
+  })
+);
 
 contactRouter.post(
   '/',

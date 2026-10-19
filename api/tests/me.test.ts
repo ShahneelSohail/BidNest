@@ -117,6 +117,16 @@ describe('watchlist, notifications and messages', () => {
     await aliceAgent.post('/api/me/notifications/read-all').expect(204);
   });
 
+  it('accepts enquiries from visitors without an account and validates them', async () => {
+    await request(app).post('/api/contact/public').send({ name: 'Guest', email: 'guest@example.com', message: 'short' }).expect(400);
+    await request(app).post('/api/contact/public').send({ name: '', email: 'guest@example.com', message: 'A long enough message' }).expect(400);
+    await request(app).post('/api/contact/public').send({ name: 'Guest', email: 'nope', message: 'A long enough message' }).expect(400);
+    await request(app).post('/api/contact/public').send({ name: 'Guest', email: 'Guest@Example.com', message: 'How do I list an item?' }).expect(201);
+
+    const stored = await prisma.contactMessage.findFirstOrThrow();
+    expect(stored).toMatchObject({ userId: null, name: 'Guest', email: 'guest@example.com', subject: 'Website enquiry', status: 'NEW' });
+  });
+
   it('sends contact messages and shows them with any reply', async () => {
     const { alice, aliceAgent } = await scenario();
     await request(app).post('/api/contact').send({ subject: 'Hello', message: 'A message long enough' }).expect(401);

@@ -88,7 +88,9 @@ messagesRouter.post(
       where: { id },
       data: { adminReply: req.body.replyContent, status: 'REPLIED', repliedAt: new Date(), repliedByUserId: currentUser(req).id, readAt: message.readAt ?? new Date() },
     });
-    await notify({ userId: message.userId, title: 'We replied to your message', message: `Re: ${message.subject}`, link: '/dashboard/messages' });
+    if (message.userId) {
+      await notify({ userId: message.userId, title: 'We replied to your message', message: `Re: ${message.subject}`, link: '/dashboard/messages' });
+    }
     res.json({ data: dto(await findMessage(id)) });
   })
 );

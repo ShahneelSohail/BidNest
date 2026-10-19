@@ -162,7 +162,7 @@ model Rating {
 
 model ContactMessage {
   id                     Int           @id @default(autoincrement())
-  userId                 Int
+  userId                 Int?
   name                   String
   email                  String
   subject                String
@@ -174,7 +174,7 @@ model ContactMessage {
   repliedByUserId        Int?
   readAt                 DateTime?
   createdAt              DateTime      @default(now())
-  user                   User          @relation("MessageAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  user                   User?         @relation("MessageAuthor", fields: [userId], references: [id], onDelete: SetNull)
   repliedBy              User?         @relation("MessageReplier", fields: [repliedByUserId], references: [id])
 
   @@index([status])
