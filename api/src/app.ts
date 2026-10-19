@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import { corsOrigins, env } from './config/env';
 import { UPLOAD_DIR } from './lib/upload';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { adminRouter } from './modules/admin/admin.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { categoryRouter } from './modules/categories/category.routes';
 import { contactRouter } from './modules/contact/contact.routes';
@@ -29,6 +30,7 @@ export const createApp = () => {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/admin', adminRouter);
   app.use('/api/categories', categoryRouter);
   app.use('/api/items', itemRouter);
   app.use('/api/seller', sellerRouter);
