@@ -150,3 +150,19 @@ describe('categories', () => {
     expect(res.body.data[0].children.map((child: { name: string }) => child.name)).toEqual(['Chairs']);
   });
 });
+
+describe('public stats', () => {
+  it('counts live auctions, ending-soon auctions, bids, members and sales', async () => {
+    const seller = await createUser();
+    const bidder = await createUser();
+    await createUser({ isBlocked: true });
+    const soon = await createItem({ sellerId: seller.id, endsInHours: 3 });
+    await createItem({ sellerId: seller.id, endsInHours: 90 });
+    await createItem({ sellerId: seller.id, status: 'SOLD', endsInHours: -4 });
+    await createItem({ sellerId: seller.id, status: 'PENDING' });
+    await prisma.bid.create({ data: { itemId: soon.id, bidderId: bidder.id, amount: 60, isWinning: true } });
+
+    const res = await request(app).get('/api/stats').expect(200);
+    expect(res.body.data).toEqual({ activeAuctions: 2, endingSoon: 1, totalBids: 1, members: 2, soldItems: 1 });
+  });
+});

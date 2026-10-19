@@ -19,6 +19,12 @@ export const verifyToken = (token: string): number | null => {
   }
 };
 
+export const readCookie = (header: string | undefined, name: string): string | undefined =>
+  header
+    ?.split(';')
+    .map(part => part.trim().split('='))
+    .find(([key]) => key === name)?.[1];
+
 export const cookieOptions = {
   httpOnly: true,
   sameSite: 'lax' as const,

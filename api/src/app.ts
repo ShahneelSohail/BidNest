@@ -13,6 +13,7 @@ import { contactRouter } from './modules/contact/contact.routes';
 import { itemRouter } from './modules/items/item.routes';
 import { meRouter } from './modules/me/me.routes';
 import { sellerRouter } from './modules/seller/seller.routes';
+import { statsRouter } from './modules/stats/stats.routes';
 import { userRouter } from './modules/users/user.routes';
 
 export const createApp = () => {
@@ -34,6 +35,7 @@ export const createApp = () => {
   app.use('/api/categories', categoryRouter);
   app.use('/api/items', itemRouter);
   app.use('/api/seller', sellerRouter);
+  app.use('/api/stats', statsRouter);
   app.use('/api/me', meRouter);
   app.use('/api/users', userRouter);
   app.use('/api/contact', contactRouter);
