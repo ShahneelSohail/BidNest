@@ -9,14 +9,14 @@ An online auction platform where sellers list items, buyers bid in real time, an
 - **Stack:** ASP.NET Core 8 MVC, SQL Server with Entity Framework Core, cookie authentication, SignalR for live bidding, Razor views with Bootstrap, BCrypt password hashing.
 - **Roles:** administrators, sellers and buyers, each with their own panel.
 - **Features:** item listings with images and documents, categories, search, auctions and bidding, watchlist, notifications, ratings, contact messages and an admin panel.
-- **Data model:** Users, Roles, Items, ItemImages, ItemDocuments, Categories, Bids, Watchlist, Notifications, Ratings and ContactMessages. The schema is in [`Database/`](Database).
+- **Data model:** Users, Roles, Items, ItemImages, ItemDocuments, Categories, Bids, Watchlist, Notifications, Ratings and ContactMessages. The schema is in [`legacy/Database/`](legacy/Database).
 - **Documentation:** the team's detailed analysis and screenshots are in [`Documentation/ORIGINAL_README.md`](Documentation/ORIGINAL_README.md), and the project presentation is in [`Documentation/`](Documentation).
 
 ### Running the original
 
-1. Create a SQL Server database named `bidnest` from [`Database/database.sql`](Database/database.sql) (and the stored procedures in [`Database/Stored_procedure.sql`](Database/Stored_procedure.sql)).
-2. Put your own SQL Server login in the `DefaultConnection` string of `BidNest/BidNest/appsettings.json`. The connection string is also hard-coded in `OnConfiguring` of `BidNest/BidNest/Models/BidnestContext.cs`; update it there as well. The original login was removed from this repository's history.
-3. From `BidNest/BidNest`, run `dotnet run`.
+1. Create a SQL Server database named `bidnest` from [`legacy/Database/database.sql`](legacy/Database/database.sql) (and the stored procedures in [`legacy/Database/Stored_procedure.sql`](legacy/Database/Stored_procedure.sql)).
+2. Put your own SQL Server login in the `DefaultConnection` string of `legacy/BidNest/BidNest/appsettings.json`. The connection string is also hard-coded in `OnConfiguring` of `legacy/BidNest/BidNest/Models/BidnestContext.cs`; update it there as well. The original login was removed from this repository's history.
+3. From `legacy/BidNest/BidNest`, run `dotnet run`.
 
 ## Credits
 
@@ -32,7 +32,7 @@ The landing page is built with React, Vite, Tailwind CSS, GSAP and three.js. It 
 
 ### Third-party assets
 
-The Bootstrap theme in [`Theme/`](Theme), the 3D models in `BidNest/BidNest/wwwroot/models`, and the "Modern Negra" demo font are third-party assets used under their own licences. Check those licences before any commercial use.
+The Bootstrap theme in [`legacy/Theme/`](legacy/Theme), the 3D models in `legacy/BidNest/BidNest/wwwroot/models`, and the "Modern Negra" demo font are third-party assets used under their own licences. Check those licences before any commercial use.
 
 ## History note
 
