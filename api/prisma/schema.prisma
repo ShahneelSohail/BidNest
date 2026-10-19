@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum ItemStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  SOLD
+  EXPIRED
+}
+
+enum MessageStatus {
+  NEW
+  READ
+  REPLIED
+  ARCHIVED
+}
+
+model User {
+  id              Int              @id @default(autoincrement())
+  username        String           @unique
+  email           String           @unique
+  passwordHash    String
+  fullName        String
+  role            Role             @default(USER)
+  isBlocked       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  items           Item[]           @relation("Seller")
+  bids            Bid[]
+  watchlist       Watchlist[]
+  notifications   Notification[]
+  ratingsGiven    Rating[]         @relation("Rater")
+  ratingsReceived Rating[]         @relation("Rated")
+  messages        ContactMessage[] @relation("MessageAuthor")
+  repliedMessages ContactMessage[] @relation("MessageReplier")
+}
+
+model Category {
+  id       Int        @id @default(autoincrement())
+  name     String
+  parentId Int?
+  isActive Boolean    @default(true)
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  items    Item[]
+}
+
+model Item {
+  id              Int            @id @default(autoincrement())
+  sellerId        Int
+  title           String
+  description     String?
+  categoryId      Int?
+  minBid          Decimal        @db.Decimal(12, 2)
+  bidIncrement    Decimal        @db.Decimal(12, 2)
+  startDate       DateTime
+  endDate         DateTime
+  status          ItemStatus     @default(PENDING)
+  featured        Boolean        @default(false)
+  rejectionReason String?
+  adminNotes      String?
+  currentPrice    Decimal        @db.Decimal(12, 2)
+  currentBidId    Int?           @unique
+  paidAt          DateTime?
+  createdAt       DateTime       @default(now())
+  seller          User           @relation("Seller", fields: [sellerId], references: [id])
+  category        Category?      @relation(fields: [categoryId], references: [id])
+  currentBid      Bid?           @relation("CurrentBid", fields: [currentBidId], references: [id])
+  bids            Bid[]          @relation("ItemBids")
+  images          ItemImage[]
+  documents       ItemDocument[]
+  watchers        Watchlist[]
+  ratings         Rating[]
+
+  @@index([status, endDate])
+  @@index([sellerId])
+  @@index([categoryId])
+}
+
+model ItemImage {
+  id        Int      @id @default(autoincrement())
+  itemId    Int
+  url       String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+model ItemDocument {
+  id        Int      @id @default(autoincrement())
+  itemId    Int
+  fileName  String
+  url       String
+  createdAt DateTime @default(now())
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+model Bid {
+  id        Int      @id @default(autoincrement())
+  itemId    Int
+  bidderId  Int
+  amount    Decimal  @db.Decimal(12, 2)
+  bidTime   DateTime @default(now())
+  isWinning Boolean  @default(false)
+  item      Item     @relation("ItemBids", fields: [itemId], references: [id], onDelete: Cascade)
+  bidder    User     @relation(fields: [bidderId], references: [id])
+  heldBy    Item?    @relation("CurrentBid")
+
+  @@index([itemId, amount(sort: Desc)])
+  @@index([bidderId])
+}
+
+model Watchlist {
+  id      Int      @id @default(autoincrement())
+  userId  Int
+  itemId  Int
+  addedAt DateTime @default(now())
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item    Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model Rating {
+  id          Int      @id @default(autoincrement())
+  raterId     Int
+  ratedUserId Int
+  itemId      Int
+  score       Int
+  comment     String?
+  createdAt   DateTime @default(now())
+  rater       User     @relation("Rater", fields: [raterId], references: [id], onDelete: Cascade)
+  ratedUser   User     @relation("Rated", fields: [ratedUserId], references: [id], onDelete: Cascade)
+  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([raterId, itemId])
+}
+
+model ContactMessage {
+  id                     Int           @id @default(autoincrement())
+  userId                 Int
+  name                   String
+  email                  String
+  subject                String
+  message                String
+  newsletterSubscription Boolean       @default(false)
+  status                 MessageStatus @default(NEW)
+  adminReply             String?
+  repliedAt              DateTime?
+  repliedByUserId        Int?
+  readAt                 DateTime?
+  createdAt              DateTime      @default(now())
+  user                   User          @relation("MessageAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  repliedBy              User?         @relation("MessageReplier", fields: [repliedByUserId], references: [id])
+
+  @@index([status])
+}
