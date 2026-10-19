@@ -3,14 +3,16 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import path from 'node:path';
 import { corsOrigins, env } from './config/env';
+import { UPLOAD_DIR } from './lib/upload';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { authRouter } from './modules/auth/auth.routes';
 import { categoryRouter } from './modules/categories/category.routes';
+import { contactRouter } from './modules/contact/contact.routes';
 import { itemRouter } from './modules/items/item.routes';
-
-export const UPLOAD_DIR = path.resolve(__dirname, '..', 'uploads');
+import { meRouter } from './modules/me/me.routes';
+import { sellerRouter } from './modules/seller/seller.routes';
+import { userRouter } from './modules/users/user.routes';
 
 export const createApp = () => {
   const app = express();
@@ -29,6 +31,10 @@ export const createApp = () => {
   app.use('/api/auth', authRouter);
   app.use('/api/categories', categoryRouter);
   app.use('/api/items', itemRouter);
+  app.use('/api/seller', sellerRouter);
+  app.use('/api/me', meRouter);
+  app.use('/api/users', userRouter);
+  app.use('/api/contact', contactRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -58,15 +58,17 @@ itemRouter.get(
     const isPrivileged = viewer && (viewer.role === 'ADMIN' || viewer.id === item?.sellerId);
     if (!item || (!['ACTIVE', 'SOLD', 'EXPIRED'].includes(item.status) && !isPrivileged)) throw notFound('Item not found.');
 
-    const [recentBids, watching, myBest] = await Promise.all([
+    const [recentBids, watching, myBest, sellerRating] = await Promise.all([
       prisma.bid.findMany({ where: { itemId: id }, orderBy: [{ amount: 'desc' }, { bidTime: 'asc' }], take: RECENT_BIDS, include: bidInclude }),
       viewer ? prisma.watchlist.findUnique({ where: { userId_itemId: { userId: viewer.id, itemId: id } } }) : null,
       viewer ? prisma.bid.findFirst({ where: { itemId: id, bidderId: viewer.id }, orderBy: { amount: 'desc' } }) : null,
+      prisma.rating.aggregate({ where: { ratedUserId: item.sellerId }, _avg: { score: true }, _count: { _all: true } }),
     ]);
 
     res.json({
       data: {
         ...toDetailItem(item),
+        sellerRating: { average: sellerRating._avg.score, count: sellerRating._count._all },
         rejectionReason: isPrivileged ? item.rejectionReason : null,
         recentBids: recentBids.map(bidDto),
         viewer: viewer
