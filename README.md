@@ -2,9 +2,49 @@
 
 An online auction platform where sellers list items, buyers bid in real time, and administrators approve and moderate listings.
 
-> **Status:** this repository holds the original ASP.NET Core application, built as a team project at Aptech. A full overhaul (Next.js, TypeScript, Express, PostgreSQL and Socket.io) is in progress on a separate branch.
+> **Status:** the overhaul is complete: a Next.js and TypeScript front end, an Express, Prisma and PostgreSQL API, and live bidding over Socket.io. The original ASP.NET Core application, built as a team project at Aptech, is kept in [`legacy/`](legacy).
 
-## The original application
+## The overhaul
+
+| Part | Stack |
+|---|---|
+| [`web/`](web) | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, TanStack Query, socket.io-client, GSAP and react-three-fiber on the landing page |
+| [`api/`](api) | Express 4, TypeScript, Prisma 6, PostgreSQL, zod validation, cookie-based JWT sessions, multer uploads, Socket.io |
+| Tests | Vitest and supertest for the API (with an embedded PostgreSQL), Playwright end-to-end tests for the web app |
+
+**Highlights**
+
+- Bidding runs inside a transaction that locks the item row, so two simultaneous bids can never both win. Every accepted bid is pushed instantly to everyone watching that auction, and outbid, won and approval notifications reach the right user in real time.
+- A background timer closes finished auctions, picks the winner and sends "ending soon" reminders at 30, 15, 5 and 1 minutes.
+- Listings go through admin approval. Admins manage users, categories, listings, bids and contact messages.
+- Buyers get a dashboard (bids, won items with payment and seller rating, watchlist, notifications). Sellers get listing management and earnings stats.
+- The landing page keeps the original look. Its 3D scenes load only when scrolled near, pause when off screen, and use compressed models (about 42 MB of models became about 1.5 MB).
+
+### Running it
+
+You need Node.js 20 or newer.
+
+```bash
+cd api
+cp .env.example .env        # set JWT_SECRET (instructions inside)
+npm install
+npm run db:dev              # local PostgreSQL on :5432 (or run `docker compose up -d` in the repo root)
+npm run db:push && npm run db:seed
+npm run dev                 # API on http://localhost:4000
+```
+
+```bash
+cd web
+cp .env.example .env
+npm install
+npm run dev                 # web app on http://localhost:3000
+```
+
+The seed creates demo data and accounts such as `admin@bidnest.test` and `maya@bidnest.test`; the shared demo password is in [`api/prisma/seed.ts`](api/prisma/seed.ts). It is for local development only.
+
+Tests: `npm test` in `api/`, and `npm run test:e2e` in `web/` (with the API and web app running).
+
+## The original application (in `legacy/`)
 
 - **Stack:** ASP.NET Core 8 MVC, SQL Server with Entity Framework Core, cookie authentication, SignalR for live bidding, Razor views with Bootstrap, BCrypt password hashing.
 - **Roles:** administrators, sellers and buyers, each with their own panel.

@@ -1,0 +1,25 @@
+@import "tailwindcss" source(none);
+@source "./**/*.{ts,tsx}";
+@source "../app/(site)/**/*.{ts,tsx}";
+
+@theme {
+    --color-yellow: #e7d393;
+    --color-surface: #0f0f10;
+    --color-surface-2: #17171a;
+    --color-line: rgb(255 255 255 / 0.1);
+    --color-muted: #9a9aa3;
+    --font-sans: var(--font-mona-sans), "Mona Sans", sans-serif;
+    --font-serif: var(--font-dm-serif), "DM Serif Text", serif;
+}
+
+html,
+body {
+    background-color: black;
+    color: white;
+    font-family: var(--font-sans);
+}
+
+::selection {
+    background: var(--color-yellow);
+    color: black;
+}
