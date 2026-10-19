@@ -7,8 +7,10 @@ interface TokenPayload {
   sub: number;
 }
 
-export const signToken = (userId: number): string =>
-  jwt.sign({ sub: userId }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] });
+export const signToken = (userId: number, expiresIn: jwt.SignOptions['expiresIn'] = env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn']): string =>
+  jwt.sign({ sub: userId }, env.JWT_SECRET, { expiresIn });
+
+export const SOCKET_TOKEN_TTL = '2m';
 
 export const verifyToken = (token: string): number | null => {
   try {

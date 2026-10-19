@@ -13,7 +13,8 @@ export const createSocketServer = (httpServer: HttpServer): Server => {
   const io = new Server(httpServer, { cors: { origin: corsOrigins, credentials: true } });
 
   io.use(async (socket, next) => {
-    const token = readCookie(socket.handshake.headers.cookie, AUTH_COOKIE);
+    const handshakeToken = typeof socket.handshake.auth.token === 'string' ? socket.handshake.auth.token : undefined;
+    const token = handshakeToken ?? readCookie(socket.handshake.headers.cookie, AUTH_COOKIE);
     const userId = token ? verifyToken(token) : null;
     const user = userId ? await prisma.user.findUnique({ where: { id: userId }, select: { id: true, isBlocked: true } }) : null;
     socket.data.userId = user && !user.isBlocked ? user.id : null;

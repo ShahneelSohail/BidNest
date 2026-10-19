@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { env } from '../../config/env';
 import { asyncHandler, badRequest, conflict, forbidden } from '../../lib/http';
 import { prisma } from '../../lib/prisma';
-import { AUTH_COOKIE, cookieOptions, signToken } from '../../lib/tokens';
+import { AUTH_COOKIE, SOCKET_TOKEN_TTL, cookieOptions, signToken } from '../../lib/tokens';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { changePasswordSchema, loginSchema, profileSchema, registerSchema } from './auth.schemas';
@@ -79,6 +79,10 @@ authRouter.get(
     res.json({ data: user });
   })
 );
+
+authRouter.get('/socket-token', requireAuth, (req, res) => {
+  res.json({ data: { token: signToken(currentUser(req).id, SOCKET_TOKEN_TTL) } });
+});
 
 authRouter.patch(
   '/me',

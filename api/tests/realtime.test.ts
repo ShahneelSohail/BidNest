@@ -5,6 +5,7 @@ import { io as connect, type Socket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runAuctionTick } from '../src/jobs/auctionTimer';
 import { prisma } from '../src/lib/prisma';
+import { notify } from '../src/modules/notifications/notification.service';
 import { createSocketServer } from '../src/realtime/socket';
 import { PASSWORD, app, createItem, createUser, loginAs, resetDb } from './helpers';
 
@@ -66,6 +67,20 @@ describe('live auctions', () => {
 
     await (await loginAs(alice.email)).post(`/api/items/${item.id}/bids`).send({ amount: 60 }).expect(201);
     expect(await received).toMatchObject({ bid: { amount: 60, bidderName: alice.username }, nextMinimumBid: 65 });
+  });
+
+  it('accepts a short-lived socket token instead of the session cookie', async () => {
+    const alice = await createUser();
+    const agent = await loginAs(alice.email);
+    const { token } = (await agent.get('/api/auth/socket-token').expect(200)).body.data as { token: string };
+    await request(app).get('/api/auth/socket-token').expect(401);
+
+    const socket = connect(url, { transports: ['websocket'], auth: { token }, forceNew: true });
+    sockets.push(socket);
+    await new Promise<void>(resolve => socket.once('connect', () => resolve()));
+    const received = once<{ title: string }>(socket, 'notification:new');
+    await notify({ userId: alice.id, title: 'Ping', message: 'Token-authenticated socket received this' });
+    expect((await received).title).toBe('Ping');
   });
 
   it('does not send bids to clients that left the auction', async () => {
