@@ -37,9 +37,14 @@ meRouter.get(
       prisma.item.count({ where: wonWhere(userId) }),
       prisma.watchlist.count({ where: { userId } }),
       prisma.notification.count({ where: { userId, isRead: false } }),
-      prisma.item.findMany({ where: { status: 'ACTIVE', endDate: { gt: now }, bids: { some: { bidderId: userId } } }, include: listInclude, orderBy: { endDate: 'asc' }, take: RECENT_LIMIT }),
+      prisma.item.findMany({
+        where: { status: 'ACTIVE', endDate: { gt: now }, bids: { some: { bidderId: userId } } },
+        include: { ...listInclude, bids: { where: { bidderId: userId }, orderBy: { amount: 'desc' }, take: 1 }, currentBid: { select: { bidderId: true } } },
+        orderBy: { endDate: 'asc' },
+        take: RECENT_LIMIT,
+      }),
     ]);
-    res.json({ data: { stats: { activeBids, leading, won, watching, unreadNotifications: unread }, endingSoon: recent.map(toListItem) } });
+    res.json({ data: { stats: { activeBids, leading, won, watching, unreadNotifications: unread }, endingSoon: recent.map(item => ({ ...toListItem(item), myHighestBid: money(item.bids[0]?.amount), isLeading: item.currentBid?.bidderId === userId })) } });
   })
 );
 

@@ -20,3 +20,11 @@ export const formatTimeLeft = (endDate: string, now: number): string => {
   if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
   return `${minutes}m ${seconds}s`;
 };
+
+export type Urgency = 'normal' | 'urgent' | 'critical';
+
+export const urgencyOf = (endDate: string, now: number): Urgency => {
+  const remaining = new Date(endDate).getTime() - now;
+  if (remaining <= 5 * MINUTE) return 'critical';
+  return remaining <= HOUR ? 'urgent' : 'normal';
+};

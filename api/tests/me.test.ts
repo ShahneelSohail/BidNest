@@ -44,6 +44,9 @@ describe('my bids and dashboard', () => {
 
     const dashboard = await aliceAgent.get('/api/me/dashboard').expect(200);
     expect(dashboard.body.data.stats).toMatchObject({ activeBids: 2, leading: 1, won: 1 });
+    const ending = dashboard.body.data.endingSoon as { title: string; myHighestBid: number; isLeading: boolean }[];
+    expect(ending.find(item => item.title === 'Leading item')).toMatchObject({ myHighestBid: 50, isLeading: true });
+    expect(ending.find(item => item.title === 'Outbid item')).toMatchObject({ myHighestBid: 50, isLeading: false });
   });
 
   it('requires a signed-in user', async () => {

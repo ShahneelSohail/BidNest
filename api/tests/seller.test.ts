@@ -86,6 +86,7 @@ describe('managing listings', () => {
     expect(all.body.data).toHaveLength(2);
     const pending = await agent.get('/api/seller/items?status=pending').expect(200);
     expect(pending.body.data.map((item: { title: string }) => item.title)).toEqual(['Mine pending']);
+    expect(pending.body.data[0].viewCount).toBe(0);
   });
 
   it('lets sellers edit only pending items they own', async () => {
@@ -161,7 +162,8 @@ describe('seller dashboard and analytics', () => {
     const me = await createUser();
     const buyer = await createUser();
     await createItem({ sellerId: me.id, status: 'PENDING' });
-    await createItem({ sellerId: me.id });
+    const live = await createItem({ sellerId: me.id });
+    await prisma.item.update({ where: { id: live.id }, data: { viewCount: 7 } });
     const soldA = await createItem({ sellerId: me.id, status: 'SOLD', endsInHours: -24, minBid: 100 });
     const soldB = await createItem({ sellerId: me.id, status: 'SOLD', endsInHours: -48, minBid: 300 });
     await prisma.item.update({ where: { id: soldA.id }, data: { currentPrice: 150 } });
@@ -174,7 +176,9 @@ describe('seller dashboard and analytics', () => {
     expect(dash.body.data.recentBids).toHaveLength(1);
 
     const analytics = await agent.get('/api/seller/analytics').expect(200);
-    expect(analytics.body.data).toMatchObject({ totalListings: 4, soldItems: 2, totalEarnings: 500, conversionRate: 50 });
+    expect(analytics.body.data).toMatchObject({ totalListings: 4, soldItems: 2, totalEarnings: 500, conversionRate: 50, totalViews: 7, rejectedListings: 0, expiredListings: 0 });
+    const dailySold = analytics.body.data.dailyEarnings.reduce((sum: number, day: { itemsSold: number }) => sum + day.itemsSold, 0);
+    expect(dailySold).toBe(2);
     expect(analytics.body.data.monthlyEarnings).toHaveLength(12);
     const monthTotal = analytics.body.data.monthlyEarnings.reduce((sum: number, month: { earnings: number }) => sum + month.earnings, 0);
     expect(monthTotal).toBe(500);

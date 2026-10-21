@@ -3,6 +3,7 @@ import { SellDashboard } from '@/site/components/sell';
 
 export const metadata: Metadata = { title: 'Sell' };
 
-export default function SellPage() {
-  return <SellDashboard />;
+export default async function SellPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  const { status } = await searchParams;
+  return <SellDashboard initialStatus={status} />;
 }

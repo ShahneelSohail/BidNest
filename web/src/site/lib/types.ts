@@ -7,6 +7,9 @@ export interface User {
   email: string;
   fullName: string;
   role: Role;
+  location: string | null;
+  bio: string | null;
+  isPublic: boolean;
   createdAt: string;
 }
 
@@ -31,6 +34,8 @@ export interface ListItem {
   bidCount: number;
   watcherCount: number;
   featured: boolean;
+  condition: string | null;
+  seller: { id: number; username: string; rating?: number | null; createdAt?: string };
   startDate: string;
   endDate: string;
   primaryImage: string | null;
@@ -50,7 +55,7 @@ export interface ItemDetail extends ListItem {
   nextMinimumBid: number;
   images: { id: number; url: string; isPrimary: boolean }[];
   documents: { id: number; fileName: string; url: string }[];
-  seller: { id: number; username: string; createdAt: string };
+  viewCount: number;
   winnerId: number | null;
   paid: boolean;
   createdAt: string;

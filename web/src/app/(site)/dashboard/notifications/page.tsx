@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Notifications } from '@/site/components/dashboard';
+import { Notifications } from '@/site/components/dashboard-notifications';
 
 export const metadata: Metadata = { title: 'Notifications' };
 

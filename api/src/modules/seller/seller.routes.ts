@@ -35,11 +35,14 @@ const ownItem = async (itemId: number, sellerId: number) => {
 const dayKey = (date: Date) => date.toISOString().slice(0, 10);
 
 const dailySeries = (sold: { endDate: Date; currentPrice: Prisma.Decimal }[], days: number) => {
-  const totals = new Map<string, number>();
-  for (const item of sold) totals.set(dayKey(item.endDate), (totals.get(dayKey(item.endDate)) ?? 0) + Number(item.currentPrice));
+  const totals = new Map<string, { earnings: number; itemsSold: number }>();
+  for (const item of sold) {
+    const entry = totals.get(dayKey(item.endDate)) ?? { earnings: 0, itemsSold: 0 };
+    totals.set(dayKey(item.endDate), { earnings: entry.earnings + Number(item.currentPrice), itemsSold: entry.itemsSold + 1 });
+  }
   return Array.from({ length: days }, (_, index) => {
     const day = dayKey(new Date(Date.now() - (days - 1 - index) * MS_PER_DAY));
-    return { day, earnings: totals.get(day) ?? 0 };
+    return { day, ...(totals.get(day) ?? { earnings: 0, itemsSold: 0 }) };
   });
 };
 
@@ -104,7 +107,7 @@ sellerRouter.get(
       prisma.item.count({ where }),
     ]);
     res.json({
-      data: items.map(item => ({ ...toListItem(item), rejectionReason: item.rejectionReason, paid: item.paidAt !== null })),
+      data: items.map(item => ({ ...toListItem(item), rejectionReason: item.rejectionReason, paid: item.paidAt !== null, viewCount: item.viewCount })),
       meta: pageMeta(query.page, query.pageSize, total),
     });
   })
@@ -268,7 +271,7 @@ sellerRouter.get(
     since.setUTCHours(0, 0, 0, 0);
 
     const [items, soldItems] = await Promise.all([
-      prisma.item.findMany({ where: { sellerId }, select: { status: true, categoryId: true, category: { select: { name: true } } } }),
+      prisma.item.findMany({ where: { sellerId }, select: { status: true, categoryId: true, viewCount: true, category: { select: { name: true } } } }),
       prisma.item.findMany({
         where: { sellerId, status: 'SOLD' },
         include: listInclude,
@@ -298,6 +301,9 @@ sellerRouter.get(
         totalListings: items.length,
         activeListings: items.filter(item => item.status === 'ACTIVE').length,
         pendingListings: items.filter(item => item.status === 'PENDING').length,
+        rejectedListings: items.filter(item => item.status === 'REJECTED').length,
+        expiredListings: items.filter(item => item.status === 'EXPIRED').length,
+        totalViews: items.reduce((sum, item) => sum + item.viewCount, 0),
         soldItems: soldItems.length,
         totalEarnings,
         averageSellingPrice: soldItems.length ? totalEarnings / soldItems.length : 0,

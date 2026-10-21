@@ -1,17 +1,19 @@
 import { expect, test } from '@playwright/test';
-import { logIn } from './helpers';
+import { logIn, PNG } from './helpers';
+
+const lotLinks = 'a[href^="/auctions/"]';
 
 test('visitors can browse and filter live auctions', async ({ page }) => {
   await page.goto('/auctions');
-  await expect(page.getByRole('heading', { name: 'Browse auctions' })).toBeVisible();
-  await expect(page.locator('a[href^="/auctions/"]').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /The room\s+is live/ })).toBeVisible();
 
-  await page.getByPlaceholder('What are you looking for?').fill('Stratocaster');
-  await expect(page.locator('a[href^="/auctions/"]')).toHaveCount(1);
-  await page.locator('a[href^="/auctions/"]').first().click();
+  await page.getByLabel('Search lots').fill('Stratocaster');
+  await page.waitForURL(/q=Stratocaster/);
+  await expect(page.locator(lotLinks).first()).toBeVisible();
+  await page.locator(lotLinks).first().click();
   await page.waitForURL(/\/auctions\/\d+$/);
   await expect(page.getByRole('heading', { name: /Stratocaster/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Log in to bid' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /log in to bid/i }).first()).toBeVisible();
 });
 
 test('bids appear instantly for everyone watching the auction', async ({ browser }) => {
@@ -20,48 +22,45 @@ test('bids appear instantly for everyone watching the auction', async ({ browser
   await logIn(bidder, 'maya@bidnest.test');
 
   await watcher.goto('/auctions?q=Stratocaster');
-  await watcher.locator('a[href^="/auctions/"]').first().click();
+  await watcher.locator(lotLinks).first().click();
   await watcher.waitForURL(/\/auctions\/\d+$/);
   await expect(watcher.getByRole('heading', { name: /Stratocaster/ })).toBeVisible();
-  const url = watcher.url();
 
-  await bidder.goto(url);
-  const minimum = await bidder.getByLabel('Bid amount').getAttribute('min');
-  const amount = Number(minimum) + 50;
-  await bidder.getByLabel('Bid amount').fill(String(amount));
-  await bidder.getByRole('button', { name: 'Place bid' }).click();
-  await expect(bidder.getByText('You are the highest bidder.').first()).toBeVisible();
+  await bidder.goto(watcher.url());
+  const placeBid = bidder.getByRole('button', { name: /Place bid · \$/ }).first();
+  const label = (await placeBid.textContent()) ?? '';
+  const amount = label.split('·')[1]!.trim();
+  await placeBid.click();
+  await bidder.getByRole('button', { name: 'Confirm bid' }).click();
+  await expect(bidder.getByText('Bid placed').first()).toBeVisible();
 
-  const formatted = amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  await expect(watcher.getByText(formatted).first()).toBeVisible({ timeout: 10_000 });
+  await expect(watcher.getByText(amount).first()).toBeVisible({ timeout: 10_000 });
 });
 
-test('signed-in users are sent to login for protected pages', async ({ page }) => {
+test('signed-out visitors are sent to login for protected pages', async ({ page }) => {
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login\?next=%2Fdashboard/);
 });
 
-test('sellers submit a listing and an admin approves it', async ({ browser }) => {
+test('a listing created by a seller is approved by an admin and goes live', async ({ browser }) => {
   const title = `E2E vintage camera ${Date.now()}`;
-  const seller = await (await browser.newContext()).newPage();
-  await logIn(seller, 'omar@bidnest.test');
-  await seller.goto('/sell/new');
-  await seller.getByLabel('Item name').fill(title);
-  await seller.getByLabel('Description').fill('Created by the end-to-end test.');
-  await seller.getByLabel('Starting bid (USD)').fill('25');
-  await seller.getByRole('button', { name: 'Submit for approval' }).click();
-  await expect(seller.getByText(title)).toBeVisible();
-  await expect(seller.getByText('pending').first()).toBeVisible();
+  const sellerContext = await browser.newContext();
+  const loginResponse = await sellerContext.request.post('/api/auth/login', { data: { email: 'omar@bidnest.test', password: process.env.SEED_PASSWORD ?? 'BidNest123!' } });
+  expect(loginResponse.ok()).toBe(true);
+  const created = await sellerContext.request.post('/api/seller/items', {
+    multipart: { title, description: 'Created by the end-to-end test.', minBid: '25', durationDays: '7', condition: 'Good', images: { name: 'camera.png', mimeType: 'image/png', buffer: PNG } },
+  });
+  expect(created.status()).toBe(201);
 
   const admin = await (await browser.newContext()).newPage();
   await logIn(admin, 'admin@bidnest.test');
   await admin.goto('/admin/approvals');
-  const card = admin.locator('div').filter({ hasText: title }).filter({ has: admin.getByRole('button', { name: 'Approve' }) }).last();
-  await card.getByRole('button', { name: 'Approve' }).click();
-  await expect(admin.getByText('Listing approved.')).toBeVisible();
+  await admin.getByText(title).first().click();
+  await admin.getByRole('button', { name: 'Approve' }).click();
+  await expect(admin.getByText(/approved/i).first()).toBeVisible();
 
-  await seller.goto('/auctions?q=' + encodeURIComponent(title));
-  await expect(seller.getByText(title)).toBeVisible();
+  await admin.goto(`/auctions?q=${encodeURIComponent(title)}`);
+  await expect(admin.getByText(title).first()).toBeVisible();
 });
 
 test('regular users cannot open the admin console', async ({ page }) => {

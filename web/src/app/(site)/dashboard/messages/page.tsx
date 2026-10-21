@@ -1,8 +1,5 @@
-import type { Metadata } from 'next';
-import { MyMessages } from '@/site/components/dashboard';
-
-export const metadata: Metadata = { title: 'Messages' };
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <MyMessages />;
+  redirect('/dashboard/support');
 }

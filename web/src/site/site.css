@@ -3,23 +3,117 @@
 @source "../app/(site)/**/*.{ts,tsx}";
 
 @theme {
-    --color-yellow: #e7d393;
-    --color-surface: #0f0f10;
-    --color-surface-2: #17171a;
-    --color-line: rgb(255 255 255 / 0.1);
-    --color-muted: #9a9aa3;
-    --font-sans: var(--font-mona-sans), "Mona Sans", sans-serif;
-    --font-serif: var(--font-dm-serif), "DM Serif Text", serif;
+  /* ink + surfaces */
+  --color-ink: #070707;
+  --color-surface: #0d0d0d;
+  --color-surface-2: #141414;
+  --color-surface-3: #1c1b19;
+
+  /* hairlines */
+  --color-line: rgb(231 211 147 / 0.14);
+  --color-line-strong: rgb(231 211 147 / 0.32);
+  --color-line-neutral: rgb(255 255 255 / 0.08);
+
+  /* text */
+  --color-text: #f1ece0;
+  --color-text-2: #bdb7aa;
+  --color-muted: #8e8a80;
+
+  /* gold (yellow kept as alias of gold-300) */
+  --color-yellow: #e7d393;
+  --color-gold-50: #fbf6e6;
+  --color-gold-100: #f6ecc9;
+  --color-gold-200: #efe0aa;
+  --color-gold-300: #e7d393;
+  --color-gold-400: #d9bd6e;
+  --color-gold-500: #c9a24f;
+  --color-gold-600: #b8893a;
+  --color-gold-deep: #b8893a;
+  --color-gold-700: #94692b;
+  --color-gold-800: #6e4d22;
+  --color-gold-900: #3f2c15;
+
+  /* semantic */
+  --color-live: #5fd39a;
+  --color-outbid: #f2a65a;
+  --color-ended: #8e8a80;
+  --color-danger: #f07a6a;
+  --color-info: #8db7e0;
+
+  /* type */
+  --font-sans: var(--font-mona-sans), "Mona Sans", sans-serif;
+  --font-serif: var(--font-dm-serif), "DM Serif Text", serif;
+  --text-display-xl: 7.5rem;  --text-display-xl--line-height: 0.95;
+  --text-display-l: 5.5rem;   --text-display-l--line-height: 1;
+  --text-display-m: 4rem;     --text-display-m--line-height: 1.02;
+  --text-h1: 2.75rem;         --text-h1--line-height: 1.08;
+  --text-h2: 1.875rem;        --text-h2--line-height: 1.12;
+
+  /* radius: mostly sharp */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-xl: 0.125rem;   /* legacy */
+  --radius-2xl: 0.25rem;   /* legacy */
+
+  /* elevation */
+  --shadow-e1: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --shadow-e2: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(231 211 147 / 0.08), 0 0 40px -8px rgb(231 211 147 / 0.28);
+  --shadow-e3: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 30px 80px -20px rgb(0 0 0 / 0.9);
+
+  /* motion */
+  --ease-rise: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --animate-rise: rise 0.6s var(--ease-rise) both;
+  --animate-flash: flash 1.2s ease-out;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-live: live-pulse 1.6s ease-in-out infinite;
 }
 
-html,
-body {
-    background-color: black;
-    color: white;
-    font-family: var(--font-sans);
+html, body { background-color: var(--color-ink); color: var(--color-text); font-family: var(--font-sans); }
+
+/* grain: fixed, never scrolls */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.09;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
-::selection {
-    background: var(--color-yellow);
-    color: black;
+::selection { background: var(--color-gold-300); color: var(--color-ink); }
+:focus-visible { outline: 2px solid var(--color-gold-300); outline-offset: 3px; }
+* { scrollbar-width: thin; scrollbar-color: var(--color-gold-900) transparent; }
+
+@utility display { font-family: var(--font-serif); letter-spacing: -0.01em; line-height: 1.02; }
+@utility eyebrow { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--color-gold-300); }
+@utility gold-text {
+  background: linear-gradient(180deg, #f6e8b8 0%, #c9a24f 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
 }
+@utility rule-gold { height: 1px; background: linear-gradient(90deg, var(--color-gold-300), transparent); }
+@utility tnum { font-variant-numeric: tabular-nums; }
+@utility gavel-mask {
+  background: linear-gradient(135deg, #c9a24f, #f6e8b8 40%, #b8893a 60%, #efe0aa);
+  mask: url("/images/Auction-Hammer-PNG-Image-removebg-preview.png") center / contain no-repeat;
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes flash { 0% { color: white; text-shadow: 0 0 28px rgb(231 211 147 / 0.9); } 100% { text-shadow: none; } }
+@keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes settle { 0% { transform: scale(1.06); filter: blur(2px); } 100% { transform: none; filter: none; } }
+
+/* Re-trigger flash on every bid: key={currentPrice} on the price node (already in AuctionDetail.tsx) */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+@utility surface-glow { box-shadow: var(--shadow-e2); }
+@utility skeleton {
+  background: linear-gradient(90deg, var(--color-surface-2) 0%, var(--color-surface-3) 50%, var(--color-surface-2) 100%);
+  background-size: 800px 100%;
+  animation: var(--animate-shimmer);
+}
+@utility rise { animation: var(--animate-rise); }
+@utility flash { animation: var(--animate-flash); }
+@utility live-dot { animation: var(--animate-live); }

@@ -31,6 +31,8 @@ describe('admin dashboard', () => {
     const res = await admin.get('/api/admin/dashboard').expect(200);
     expect(res.body.data.stats).toMatchObject({ totalUsers: 3, liveAuctions: 1, pendingApprovals: 1, totalBids: 1, newMessages: 1 });
     expect(res.body.data.activity.length).toBeGreaterThan(0);
+    expect(res.body.data.bidsPerHour).toHaveLength(24);
+    expect(res.body.data.bidsPerHour[23]).toBe(1);
   });
 });
 
