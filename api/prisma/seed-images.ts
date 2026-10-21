@@ -50,7 +50,7 @@ const svgFor = (glyph: Glyph, title: string, accent: string): string => `<svg xm
   <rect width="800" height="600" fill="url(#glow)"/>
   <rect x="24" y="24" width="752" height="552" rx="6" fill="none" stroke="#d8b25c" stroke-opacity=".35" stroke-width="2"/>
   <g>${GLYPHS[glyph]}</g>
-  <text x="400" y="505" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="38" font-weight="700" fill="url(#silver)">${escapeXml(title)}</text>
+  <text x="400" y="505" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${Math.min(38, Math.floor(680 / (title.length * 0.58)))}" font-weight="700" fill="url(#silver)">${escapeXml(title)}</text>
   <text x="400" y="545" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" letter-spacing="6" fill="#d8b25c">BIDNEST</text>
 </svg>
 `;

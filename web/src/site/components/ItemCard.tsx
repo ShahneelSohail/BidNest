@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { formatMoney, formatTimeLeft, urgencyOf, type Urgency } from '../lib/format';
+import { type Urgency, formatMoney, formatTimeLeft, plural, urgencyOf } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import type { ListItem } from '../lib/types';
 import { cx, Skeleton, StatusBadge } from './ui';
@@ -59,7 +59,7 @@ export const ItemCard = ({ item }: { item: ListItem }) => (
         <p className="display gold-text tnum text-2xl">{formatMoney(item.currentPrice)}</p>
       </div>
       <div className="tnum text-right text-xs text-muted">
-        <p>{item.bidCount} bids</p>
+        <p>{plural(item.bidCount, 'bid')}</p>
         {item.status === 'active' && <Countdown endDate={item.endDate} className="mt-0.5 block" />}
       </div>
     </div>

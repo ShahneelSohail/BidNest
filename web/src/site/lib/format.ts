@@ -28,3 +28,5 @@ export const urgencyOf = (endDate: string, now: number): Urgency => {
   if (remaining <= 5 * MINUTE) return 'critical';
   return remaining <= HOUR ? 'urgent' : 'normal';
 };
+
+export const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`;

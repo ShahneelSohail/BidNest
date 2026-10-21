@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { api, withQuery } from '../lib/api';
-import { formatMoney, urgencyOf, type Urgency } from '../lib/format';
+import { formatMoney, plural, urgencyOf, type Urgency } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import { getSocket } from '../lib/socket';
 import type { AuctionEnded, BidPlaced, ItemDetail, ListItem } from '../lib/types';
@@ -227,7 +227,7 @@ export const AuctionDetail = ({ itemId }: { itemId: number }) => {
   const watching = Boolean(data.viewer?.isWatching);
   const canWatch = Boolean(user) && state !== 'own' && state !== 'pending';
   const hasMobileBar = mobileBarStates.includes(state);
-  const metaLine = data.hasBids ? `${data.bidCount} bids · ${data.watcherCount} watchers · opened at ${formatMoney(data.minBid)}` : `Opening bid ${formatMoney(data.minBid)} · increment ${formatMoney(data.bidIncrement)}`;
+  const metaLine = data.hasBids ? `${plural(data.bidCount, 'bid')} · ${plural(data.watcherCount, 'watcher')} · opened at ${formatMoney(data.minBid)}` : `Opening bid ${formatMoney(data.minBid)} · increment ${formatMoney(data.bidIncrement)}`;
   const amounts = [...data.recentBids].reverse().map(bid => bid.amount);
   const isPending = data.status === 'pending';
 
@@ -281,12 +281,12 @@ export const AuctionDetail = ({ itemId }: { itemId: number }) => {
               {isLive && (
                 <span className="inline-flex items-center gap-2 text-xs text-text-2 tnum">
                   <span className="live-dot size-[7px] rounded-full bg-live" />
-                  {data.watcherCount} watching · {data.bidCount} bids
+                  {data.watcherCount} watching · {plural(data.bidCount, 'bid')}
                 </span>
               )}
             </div>
-            <div className="flex items-end justify-between gap-5">
-              <p key={data.currentPrice} className="flash display gold-text origin-bottom-left text-7xl leading-[0.92] tracking-[-0.02em] tnum sm:text-[96px]">
+            <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-3">
+              <p key={data.currentPrice} className="flash display gold-text origin-bottom-left text-7xl leading-[0.92] tracking-[-0.02em] tnum sm:text-[88px]">
                 {formatMoney(data.currentPrice)}
               </p>
               {amounts.length > 1 && <Sparkline amounts={amounts} />}

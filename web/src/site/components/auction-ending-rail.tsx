@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { formatMoney } from '../lib/format';
+import { formatMoney, plural } from '../lib/format';
 import type { ListItem } from '../lib/types';
 import { Countdown, lotNumber } from './ItemCard';
 
@@ -19,7 +19,7 @@ const FeatureCard = ({ item }: { item: ListItem }) => (
       </div>
       <div className="shrink-0 text-right">
         <p className="mb-1 text-[10px] tracking-[0.2em] text-text-2 uppercase">
-          {item.bidCount} bids · <Countdown endDate={item.endDate} className="font-semibold" />
+          {plural(item.bidCount, 'bid')} · <Countdown endDate={item.endDate} className="font-semibold" />
         </p>
         <p className="display gold-text tnum text-4xl sm:text-[56px] sm:leading-none">{formatMoney(item.currentPrice)}</p>
       </div>

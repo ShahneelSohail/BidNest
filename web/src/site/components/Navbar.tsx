@@ -84,7 +84,7 @@ export const Navbar = () => {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-ink/90 backdrop-blur-lg">
-      <div className="mx-auto flex h-[72px] max-w-[1320px] items-center gap-8 px-6 md:px-12">
+      <div className="mx-auto flex h-[72px] max-w-[1560px] items-center gap-8 px-6 md:px-12">
         <Link href="/" className="display gold-text text-[26px]">
           BidNest
         </Link>

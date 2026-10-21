@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { formatMoney } from '../lib/format';
+import { formatMoney, plural } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import type { Bid } from '../lib/types';
 import { cx } from './ui';
@@ -25,7 +25,7 @@ export const AuctionLedger = ({ bids, bidCount, userId, isLive }: { bids: Bid[];
     <div className="flex flex-col gap-1 pt-4">
       <div className="flex items-baseline justify-between border-b border-line-strong pb-3.5">
         <h2 className="display text-3xl">Bid ledger</h2>
-        <span className="text-[13px] text-muted tnum">{bidCount} bids</span>
+        <span className="text-[13px] text-muted tnum">{plural(bidCount, 'bid')}</span>
       </div>
       {bids.length === 0 ? (
         <div className="flex flex-col items-center gap-3.5 py-10 text-center">

@@ -97,9 +97,9 @@ export const AdminShell = ({ children }: { children: ReactNode }) => {
     <div className="grid gap-8 lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-0 lg:border lg:border-line">
       <aside className="flex flex-col bg-surface lg:border-r lg:border-line lg:px-3.5 lg:py-7">
         <nav aria-label="Admin" className="flex gap-1 overflow-x-auto lg:flex-col lg:gap-0.5">
-          {sections.map(section => (
+          {sections.map((section, sectionIndex) => (
             <div key={section.title} className="contents">
-              <p className="mx-3 mt-6 mb-2.5 hidden text-[10px] font-semibold tracking-[0.22em] text-muted uppercase first:mt-0 lg:block">{section.title}</p>
+              <p className={cx('mx-3 mb-2.5 hidden text-[10px] font-semibold tracking-[0.22em] text-muted uppercase lg:block', sectionIndex ? 'mt-9' : 'mt-0')}>{section.title}</p>
               {section.links.map(link => {
                 const active = link.href === '/admin' ? pathname === link.href : pathname.startsWith(link.href);
                 const count = link.badge && stats?.[link.badge.stat];

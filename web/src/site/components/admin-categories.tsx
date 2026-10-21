@@ -1,5 +1,6 @@
 'use client';
 
+import { plural } from '../lib/format';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
@@ -78,7 +79,7 @@ const CategoryRow = ({ category, lots, depth, collapsed, selected, onToggleColla
           {!category.isActive && <Pill tone="neutral">Hidden</Pill>}
         </span>
       )}
-      <span className="tnum shrink-0 text-[13px] text-muted">{lots} lots</span>
+      <span className="tnum shrink-0 text-[13px] text-muted">{plural(lots, 'lot')}</span>
       <span className="flex shrink-0 items-center gap-1">
         <Button size="sm" variant="ghost" onClick={() => setEditing(true)} aria-label={`Rename ${category.name}`}>
           <Icon name="pencil" size={14} />
@@ -174,7 +175,7 @@ const MergePanel = ({ chosen, onClear }: { chosen: AdminCategory[]; onClear: () 
               <span className={cx('size-2.5 rounded-full bg-gold-300 transition-transform', category.id === keep.id ? 'scale-100' : 'scale-0')} />
             </span>
             <span className="truncate text-sm">{category.name}</span>
-            <span className="text-xs text-muted">{category.itemCount} lots</span>
+            <span className="text-xs text-muted">{plural(category.itemCount, 'lot')}</span>
           </button>
         ))}
       </div>
@@ -206,7 +207,7 @@ const Manager = ({ categories }: { categories: AdminCategory[] }) => {
     <div className="grid items-start gap-12 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex flex-col gap-6">
         <AdminTitle
-          eyebrow={`Taxonomy · ${subcategories} subcategories · ${totalLots} lots`}
+          eyebrow={`Taxonomy · ${subcategories} subcategories · ${plural(totalLots, 'lot')}`}
           title="Categories"
           action={
             <Button variant="secondary" onClick={() => setCreating({ parentId: null })}>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
-import { formatMoney } from '../lib/format';
+import { formatMoney, plural } from '../lib/format';
 import { formatShortDate, formatWeekday, greeting, timeAgo } from '../lib/time';
 import type { AppNotification, ListItem } from '../lib/types';
 import { Icon, type IconName } from './dashboard-icons';
@@ -392,7 +392,7 @@ export const MyBids = () => {
                           <div>
                             <p className="display text-[19px] leading-tight">{item.title}</p>
                             <p className="mt-1 text-xs text-muted">
-                              {lotNumber(item.id)} · {item.bidCount} bids
+                              {lotNumber(item.id)} · {plural(item.bidCount, 'bid')}
                             </p>
                           </div>
                         </Link>

@@ -55,16 +55,17 @@ export const AuctionGallery = ({ images, title, lotId }: { images: GalleryImage[
   const image = images[index];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[80px_minmax(0,1fr)]">
+    <div className={cx('grid gap-4', images.length > 1 && 'lg:grid-cols-[80px_minmax(0,1fr)]')}>
+      {images.length > 1 && (
       <div className="order-2 flex gap-3 overflow-x-auto lg:order-1 lg:flex-col lg:overflow-visible">
-        {images.length > 1 &&
-          images.map((thumb, thumbIndex) => (
+        {images.map((thumb, thumbIndex) => (
             <button key={thumb.id} onClick={() => setIndex(thumbIndex)} aria-label={`View image ${thumbIndex + 1}`} className={cx('h-[100px] w-20 shrink-0 overflow-hidden border bg-surface-2 transition', thumbIndex === index ? 'border-gold-300' : 'border-line opacity-60 hover:opacity-100')}>
               <img src={thumb.url} alt="" className="size-full object-cover" />
             </button>
           ))}
       </div>
-      <button onClick={() => image && setZoomed(true)} aria-label="Open image viewer" className="group relative order-1 aspect-[4/5] cursor-zoom-in overflow-hidden bg-surface-2 lg:order-2">
+      )}
+      <button onClick={() => image && setZoomed(true)} aria-label="Open image viewer" className="group relative order-1 aspect-[4/5] max-h-[820px] w-full cursor-zoom-in overflow-hidden bg-surface-2 lg:order-2">
         {image ? (
           <img src={image.url} alt={title} className="size-full object-cover transition-transform duration-[1200ms] ease-[var(--ease-expo)] group-hover:scale-105" />
         ) : (

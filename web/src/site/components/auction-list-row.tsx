@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { formatMoney } from '../lib/format';
+import { formatMoney, plural } from '../lib/format';
 import type { ListItem } from '../lib/types';
 import { Countdown, lotNumber } from './ItemCard';
 import { StatusBadge } from './ui';
@@ -20,7 +20,7 @@ export const AuctionListRow = ({ item }: { item: ListItem }) => (
       <div>
         <p className="mb-0.5 text-[10px] tracking-[0.2em] text-muted uppercase">{item.hasBids ? 'Current bid' : 'Opening bid'}</p>
         <p className="display tnum text-3xl text-gold-300">{formatMoney(item.currentPrice)}</p>
-        <p className="mt-0.5 text-xs text-muted">{item.bidCount} bids</p>
+        <p className="mt-0.5 text-xs text-muted">{plural(item.bidCount, 'bid')}</p>
       </div>
       <div className="text-right">
         <p className="mb-0.5 text-[10px] tracking-[0.2em] text-muted uppercase">{item.status === 'active' ? 'Time left' : 'Status'}</p>

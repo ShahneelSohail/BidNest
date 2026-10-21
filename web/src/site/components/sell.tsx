@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { formatMoney } from '../lib/format';
+import { formatMoney, plural } from '../lib/format';
 import { analyticsRanges, countsOf, formatDate, formatWholeMoney, statusFilters, useSellerAnalytics, type AnalyticsRange, type SellerAnalytics, type StatusFilter } from '../lib/seller';
 import { lotNumber } from './ItemCard';
 import { Icon } from './sell-icons';
@@ -103,7 +103,7 @@ const RecentSales = ({ sales }: { sales: SellerAnalytics['recentSales'] }) =>
               <div className="min-w-0 flex-1">
                 <p className="display truncate text-[19px] leading-[1.2]">{sale.title}</p>
                 <p className="mt-[3px] text-xs text-muted">
-                  {lotNumber(sale.id)} · sold {formatDate(sale.endDate)} · {sale.bidCount} bids
+                  {lotNumber(sale.id)} · sold {formatDate(sale.endDate)} · {plural(sale.bidCount, 'bid')}
                 </p>
               </div>
               <p className="display gold-text tnum text-xl">{formatMoney(sale.currentPrice)}</p>

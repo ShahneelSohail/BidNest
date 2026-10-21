@@ -14,11 +14,11 @@ const rings = ['size-[640px] border-gold-300/12', 'size-[860px] border-gold-300/
 
 export const AuthArt = ({ mode }: { mode: 'login' | 'register' }) => (
   <div className="relative flex min-h-[260px] flex-col justify-between overflow-hidden border-b border-line bg-[radial-gradient(ellipse_70%_60%_at_55%_42%,#1f1a0f_0%,#0c0b08_48%,#070707_78%)] px-6 py-8 sm:px-14 sm:py-10 lg:border-r lg:border-b-0">
-    <style>{'@keyframes sway{0%,100%{transform:translate(-50%,-50%) rotate(-16deg)}50%{transform:translate(-50%,-50%) rotate(-11deg)}}'}</style>
+    <style>{'@keyframes sway{0%,100%{rotate:-16deg}50%{rotate:-11deg}}'}</style>
     {rings.map(ring => (
       <div key={ring} className={`pointer-events-none absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border ${ring}`} />
     ))}
-    <div className="gavel-mask pointer-events-none absolute top-[42%] left-1/2 h-[250px] w-[330px] -translate-x-1/2 -translate-y-1/2 -rotate-[16deg] drop-shadow-[0_40px_60px_rgba(0,0,0,0.7)] lg:h-[480px] lg:w-[600px] lg:[animation:sway_9s_ease-in-out_infinite]" />
+    <div className="gavel-mask pointer-events-none absolute top-[36%] left-1/2 h-[250px] w-[330px] -translate-x-1/2 -translate-y-1/2 -rotate-[16deg] drop-shadow-[0_40px_60px_rgba(0,0,0,0.7)] lg:aspect-[5/4] lg:h-auto lg:w-[54%] lg:[animation:sway_9s_ease-in-out_infinite]" />
 
     <div className="relative flex items-center justify-between">
       <span className="display gold-text text-2xl lg:text-3xl">BidNest</span>

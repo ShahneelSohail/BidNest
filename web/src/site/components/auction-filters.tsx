@@ -145,11 +145,11 @@ export const FilterBar = (props: FilterBarProps) => {
 
   return (
     <div className="sticky top-[72px] z-30 -mx-6 border-y border-line bg-ink/92 backdrop-blur-xl md:-mx-12">
-      <div className="mx-auto flex max-w-[1320px] items-center gap-3 px-6 pt-4 pb-3 md:px-12 lg:gap-5">
+      <div className="mx-auto flex max-w-[1560px] items-center gap-3 px-6 pt-6 pb-4 md:px-12 lg:gap-8">
         <SearchBox value={props.search} onChange={props.onSearch} />
-        <div className="hidden min-w-0 flex-1 gap-2 overflow-x-auto lg:flex">
+        <div className="hidden min-w-0 flex-1 gap-3 overflow-x-auto [mask-image:linear-gradient(90deg,#000_calc(100%-48px),transparent)] [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
           {chips.map(chip => (
-            <button key={chip.id} aria-pressed={String(chip.id) === props.categoryId} onClick={() => props.onCategory(String(chip.id))} className={cx(pill(String(chip.id) === props.categoryId), 'flex h-10 items-center gap-2 px-4 text-[13px]')}>
+            <button key={chip.id} aria-pressed={String(chip.id) === props.categoryId} onClick={() => props.onCategory(String(chip.id))} className={cx(pill(String(chip.id) === props.categoryId), 'flex h-10 shrink-0 items-center gap-2 px-5 text-[13px]')}>
               {chip.name}
               <span className="text-[11px] opacity-60 tnum">{chip.activeItems}</span>
             </button>
@@ -166,7 +166,7 @@ export const FilterBar = (props: FilterBarProps) => {
           Filters
         </button>
       </div>
-      <div className="mx-auto flex max-w-[1320px] items-center gap-3 px-6 pb-3.5 text-[13px] md:px-12 lg:gap-7">
+      <div className="mx-auto flex max-w-[1560px] items-center gap-3 px-6 pt-1 pb-5 text-[13px] md:px-12 lg:gap-8">
         <div className="hidden items-center gap-1 lg:flex">
           <span className="mr-2 text-muted">Status</span>
           {statusOptions.map(option => (
@@ -186,7 +186,7 @@ export const FilterBar = (props: FilterBarProps) => {
           <SortMenu value={props.sort} onChange={props.onSort} />
         </div>
       </div>
-      <div className="mx-auto max-w-[1320px] overflow-x-auto px-6 pb-3 md:px-12 lg:hidden">
+      <div className="mx-auto max-w-[1560px] overflow-x-auto px-6 pb-3 md:px-12 lg:hidden">
         <div className="flex gap-2">
           {chips.map(chip => (
             <button key={chip.id} onClick={() => props.onCategory(String(chip.id))} className={cx(pill(String(chip.id) === props.categoryId), 'flex h-9 items-center gap-2 px-3.5 text-[13px]')}>
