@@ -66,6 +66,18 @@ authRouter.post(
   })
 );
 
+if (env.NODE_ENV === 'development') {
+  authRouter.post(
+    '/dev-login',
+    asyncHandler(async (req, res) => {
+      const user = await prisma.user.findUnique({ where: { email: String(req.body.email) }, select: publicUser });
+      if (!user) throw badRequest('No such user.');
+      startSession(res, user.id);
+      res.json({ data: user });
+    })
+  );
+}
+
 authRouter.post('/logout', (_req, res) => {
   res.clearCookie(AUTH_COOKIE, { ...cookieOptions, maxAge: undefined });
   res.status(204).end();
