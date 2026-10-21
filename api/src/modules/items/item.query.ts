@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { pageQuery } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+const endOfDay = (now: Date): Date => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
 
 const optionalNumber = z.preprocess(value => (value === '' ? undefined : value), z.coerce.number().min(0).optional());
 const optionalInt = z.preprocess(value => (value === '' ? undefined : value), z.coerce.number().int().optional());
@@ -14,7 +17,7 @@ export const itemsQuerySchema = pageQuery.extend({
   categoryId: optionalInt,
   minPrice: optionalNumber,
   maxPrice: optionalNumber,
-  status: z.enum(['active', 'ending', 'sold', 'expired', 'all']).default('active'),
+  status: z.enum(['active', 'ending', 'hour', 'today', 'featured', 'sold', 'expired', 'all']).default('active'),
   sort: z.enum(['ending', 'newest', 'price_asc', 'price_desc', 'bids']).default('ending'),
   hasBids: z.enum(['true', 'false']).optional(),
   endsAfter: optionalDate,
@@ -29,6 +32,12 @@ const statusFilter = (status: ItemsQuery['status'], now: Date): Prisma.ItemWhere
       return { status: 'ACTIVE', endDate: { gt: now } };
     case 'ending':
       return { status: 'ACTIVE', endDate: { gt: now, lte: new Date(now.getTime() + DAY_MS) } };
+    case 'hour':
+      return { status: 'ACTIVE', endDate: { gt: now, lte: new Date(now.getTime() + HOUR_MS) } };
+    case 'today':
+      return { status: 'ACTIVE', endDate: { gt: now, lte: endOfDay(now) } };
+    case 'featured':
+      return { status: 'ACTIVE', endDate: { gt: now }, featured: true };
     case 'sold':
       return { status: 'SOLD' };
     case 'expired':

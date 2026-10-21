@@ -9,6 +9,7 @@ export const apiStatus = (status: ItemStatus) => status.toLowerCase() as Lowerca
 export const listInclude = {
   category: { select: { id: true, name: true } },
   images: { where: { isPrimary: true }, take: 1 },
+  seller: { select: { id: true, username: true } },
   _count: { select: { bids: true, watchers: true } },
 } satisfies Prisma.ItemInclude;
 
@@ -47,6 +48,8 @@ export const toListItem = (item: ListItem) => ({
   bidCount: item._count.bids,
   watcherCount: item._count.watchers,
   featured: item.featured,
+  condition: item.condition,
+  seller: item.seller,
   startDate: item.startDate,
   endDate: item.endDate,
   primaryImage: item.images[0] ? imageUrl(item.images[0].url) : null,
@@ -58,6 +61,7 @@ export const toDetailItem = (item: DetailItem) => ({
   images: item.images.map(image => ({ id: image.id, url: imageUrl(image.url), isPrimary: image.isPrimary })),
   documents: item.documents.map(doc => ({ id: doc.id, fileName: doc.fileName, url: imageUrl(doc.url) })),
   seller: item.seller,
+  viewCount: item.viewCount,
   winnerId: item.status === 'SOLD' ? (item.currentBid?.bidderId ?? null) : null,
   paid: item.paidAt !== null,
   createdAt: item.createdAt,

@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { Router, type Request } from 'express';
 import type { z } from 'zod';
 import { asyncHandler, badRequest, forbidden, notFound } from '../../lib/http';
@@ -9,7 +10,7 @@ import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { closeAuction } from '../auctions/auction.service';
 import { detailInclude, listInclude, toDetailItem, toListItem } from '../items/item.dto';
-import { createItemSchema, extendSchema, itemIdParams, sellerItemsQuery, updateItemSchema, bidIncrementFor } from './seller.schemas';
+import { analyticsQuery, createItemSchema, extendSchema, itemIdParams, sellerItemsQuery, updateItemSchema, bidIncrementFor } from './seller.schemas';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
@@ -29,6 +30,17 @@ const ownItem = async (itemId: number, sellerId: number) => {
   if (!item) throw notFound('Item not found.');
   if (item.sellerId !== sellerId) throw forbidden("You don't have permission to change this item.");
   return item;
+};
+
+const dayKey = (date: Date) => date.toISOString().slice(0, 10);
+
+const dailySeries = (sold: { endDate: Date; currentPrice: Prisma.Decimal }[], days: number) => {
+  const totals = new Map<string, number>();
+  for (const item of sold) totals.set(dayKey(item.endDate), (totals.get(dayKey(item.endDate)) ?? 0) + Number(item.currentPrice));
+  return Array.from({ length: days }, (_, index) => {
+    const day = dayKey(new Date(Date.now() - (days - 1 - index) * MS_PER_DAY));
+    return { day, earnings: totals.get(day) ?? 0 };
+  });
 };
 
 const monthKey = (date: Date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -115,7 +127,7 @@ sellerRouter.post(
   validate('body', createItemSchema),
   asyncHandler(async (req, res) => {
     const files = uploadedFiles(req);
-    const { title, description, categoryId, minBid, durationDays } = req.body as CreateBody;
+    const { title, description, categoryId, minBid, durationDays, condition, increment } = req.body as CreateBody;
     try {
       if (categoryId && !(await prisma.category.findFirst({ where: { id: categoryId, isActive: true } }))) {
         throw badRequest('Choose a valid category.');
@@ -127,9 +139,10 @@ sellerRouter.post(
           title,
           description,
           categoryId,
+          condition,
           minBid,
           currentPrice: minBid,
-          bidIncrement: bidIncrementFor(minBid),
+          bidIncrement: bidIncrementFor(minBid, increment),
           startDate: new Date(now),
           endDate: new Date(now + durationDays * MS_PER_DAY),
           status: 'PENDING',
@@ -153,7 +166,7 @@ sellerRouter.patch(
   asyncHandler(async (req, res) => {
     const files = uploadedFiles(req);
     const { id } = req.params as unknown as Params;
-    const { title, description, categoryId, minBid, removeImageIds } = req.body as UpdateBody;
+    const { title, description, categoryId, minBid, removeImageIds, condition, increment } = req.body as UpdateBody;
     try {
       const item = await ownItem(id, currentUser(req).id);
       if (item.status !== 'PENDING') throw badRequest('You can only edit items that are pending approval.');
@@ -174,9 +187,10 @@ sellerRouter.patch(
             title,
             description,
             categoryId,
+            condition,
             minBid,
             currentPrice: minBid,
-            bidIncrement: bidIncrementFor(minBid),
+            bidIncrement: bidIncrementFor(minBid, increment),
             images: { create: files.map((file, index) => ({ url: uploadedPath(file), isPrimary: !hasPrimary && index === 0 })) },
           },
         }),
@@ -245,8 +259,10 @@ sellerRouter.post(
 
 sellerRouter.get(
   '/analytics',
+  validate('query', analyticsQuery),
   asyncHandler(async (req, res) => {
     const sellerId = currentUser(req).id;
+    const { days } = req.query as unknown as z.infer<typeof analyticsQuery>;
     const since = new Date();
     since.setUTCMonth(since.getUTCMonth() - (MONTHS_IN_ANALYTICS - 1), 1);
     since.setUTCHours(0, 0, 0, 0);
@@ -287,6 +303,7 @@ sellerRouter.get(
         averageSellingPrice: soldItems.length ? totalEarnings / soldItems.length : 0,
         conversionRate: items.length ? (soldItems.length / items.length) * 100 : 0,
         monthlyEarnings,
+        dailyEarnings: dailySeries(soldItems, days),
         topCategories: [...categoryTotals.entries()]
           .map(([name, count]) => ({ name, count }))
           .sort((a, b) => b.count - a.count)

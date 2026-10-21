@@ -66,3 +66,10 @@ export const createItem = (overrides: ItemOverrides) => {
     },
   });
 };
+
+export const address = { label: 'Home', name: 'Elena Marsh', line1: '221 Kent Avenue', city: 'Brooklyn', region: 'NY', postal: '11249', country: 'USA' };
+
+export const checkout = async (agent: Awaited<ReturnType<typeof loginAs>>, itemId: number) => {
+  const { id: addressId } = (await agent.post('/api/me/addresses').send(address).expect(201)).body.data as { id: number };
+  return agent.post(`/api/me/won/${itemId}/checkout`).send({ addressId, delivery: 'standard', payment: { brand: 'Visa', last4: '4242' } });
+};

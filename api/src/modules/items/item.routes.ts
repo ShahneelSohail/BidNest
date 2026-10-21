@@ -28,7 +28,10 @@ itemRouter.get(
       prisma.item.findMany({ where, orderBy: buildItemOrder(query.sort), include: listInclude, ...paginate(query) }),
       prisma.item.count({ where }),
     ]);
-    res.json({ data: items.map(toListItem), meta: pageMeta(query.page, query.pageSize, total) });
+    const ratings = await prisma.rating.groupBy({ by: ['ratedUserId'], where: { ratedUserId: { in: items.map(item => item.sellerId) } }, _avg: { score: true } });
+    const ratingOf = (sellerId: number) => ratings.find(entry => entry.ratedUserId === sellerId)?._avg.score ?? null;
+    const data = items.map(item => ({ ...toListItem(item), seller: { ...item.seller, rating: ratingOf(item.sellerId) } }));
+    res.json({ data, meta: pageMeta(query.page, query.pageSize, total) });
   })
 );
 
@@ -57,6 +60,7 @@ itemRouter.get(
     const viewer = req.user;
     const isPrivileged = viewer && (viewer.role === 'ADMIN' || viewer.id === item?.sellerId);
     if (!item || (!['ACTIVE', 'SOLD', 'EXPIRED'].includes(item.status) && !isPrivileged)) throw notFound('Item not found.');
+    if (viewer?.id !== item.sellerId) await prisma.item.update({ where: { id }, data: { viewCount: { increment: 1 } } });
 
     const [recentBids, watching, myBest, sellerRating] = await Promise.all([
       prisma.bid.findMany({ where: { itemId: id }, orderBy: [{ amount: 'desc' }, { bidTime: 'asc' }], take: RECENT_BIDS, include: bidInclude }),

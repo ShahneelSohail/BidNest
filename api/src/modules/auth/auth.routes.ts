@@ -13,7 +13,7 @@ const BCRYPT_ROUNDS = 10;
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_ATTEMPTS = 30;
 
-const publicUser = { id: true, username: true, email: true, fullName: true, role: true, createdAt: true } as const;
+const publicUser = { id: true, username: true, email: true, fullName: true, role: true, location: true, bio: true, isPublic: true, createdAt: true } as const;
 
 const authLimiter = rateLimit({
   windowMs: AUTH_WINDOW_MS,
@@ -62,7 +62,7 @@ authRouter.post(
     if (user.isBlocked) throw forbidden('Your account has been blocked. Please contact support.');
 
     startSession(res, user.id);
-    res.json({ data: { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, createdAt: user.createdAt } });
+    res.json({ data: { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, location: user.location, bio: user.bio, isPublic: user.isPublic, createdAt: user.createdAt } });
   })
 );
 
@@ -90,11 +90,11 @@ authRouter.patch(
   validate('body', profileSchema),
   asyncHandler(async (req, res) => {
     const { id } = currentUser(req);
-    const { fullName, email } = req.body;
+    const { fullName, email, location, bio, isPublic } = req.body;
     const taken = await prisma.user.findFirst({ where: { email, NOT: { id } }, select: { id: true } });
     if (taken) throw conflict('That email is already registered.');
 
-    const user = await prisma.user.update({ where: { id }, data: { fullName, email }, select: publicUser });
+    const user = await prisma.user.update({ where: { id }, data: { fullName, email, location, bio, isPublic }, select: publicUser });
     res.json({ data: user });
   })
 );

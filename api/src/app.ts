@@ -11,6 +11,8 @@ import { authRouter } from './modules/auth/auth.routes';
 import { categoryRouter } from './modules/categories/category.routes';
 import { contactRouter } from './modules/contact/contact.routes';
 import { itemRouter } from './modules/items/item.routes';
+import { checkoutRouter } from './modules/me/checkout.routes';
+import { preferencesRouter } from './modules/me/preferences.routes';
 import { meRouter } from './modules/me/me.routes';
 import { sellerRouter } from './modules/seller/seller.routes';
 import { statsRouter } from './modules/stats/stats.routes';
@@ -36,6 +38,8 @@ export const createApp = () => {
   app.use('/api/items', itemRouter);
   app.use('/api/seller', sellerRouter);
   app.use('/api/stats', statsRouter);
+  app.use('/api/me', checkoutRouter);
+  app.use('/api/me', preferencesRouter);
   app.use('/api/me', meRouter);
   app.use('/api/users', userRouter);
   app.use('/api/contact', contactRouter);

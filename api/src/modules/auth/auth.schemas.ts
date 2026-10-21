@@ -23,6 +23,9 @@ export const loginSchema = z.object({
 export const profileSchema = z.object({
   fullName: z.string().trim().min(1, 'Full name is required').max(100, 'Full name cannot exceed 100 characters'),
   email,
+  location: z.string().trim().max(100).optional(),
+  bio: z.string().trim().max(300, 'Bio cannot exceed 300 characters').optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export const changePasswordSchema = z.object({

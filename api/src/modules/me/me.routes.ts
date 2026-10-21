@@ -7,7 +7,7 @@ import { money } from '../../lib/serialize';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { listInclude, toListItem } from '../items/item.dto';
-import { notify } from '../notifications/notification.service';
+import { wonWhere } from './won';
 
 const RECENT_LIMIT = 5;
 
@@ -22,7 +22,6 @@ const notificationsQuery = pageQuery.extend({ unread: z.enum(['true', 'false']).
 type BidsQuery = z.infer<typeof bidsQuery>;
 type Params = z.infer<typeof idParams>;
 
-const wonWhere = (userId: number) => ({ status: 'SOLD' as const, currentBid: { is: { bidderId: userId } } });
 
 export const meRouter = Router();
 meRouter.use(requireAuth);
@@ -100,22 +99,6 @@ meRouter.get(
         myRating: item.ratings[0] ? { score: item.ratings[0].score, comment: item.ratings[0].comment } : null,
       })),
     });
-  })
-);
-
-meRouter.post(
-  '/won/:id/pay',
-  validate('params', idParams),
-  asyncHandler(async (req, res) => {
-    const { id } = req.params as unknown as Params;
-    const userId = currentUser(req).id;
-    const item = await prisma.item.findFirst({ where: { id, ...wonWhere(userId) } });
-    if (!item) throw notFound('Won auction not found.');
-    if (item.paidAt) throw conflict('This auction has already been paid.');
-
-    const paid = await prisma.item.update({ where: { id }, data: { paidAt: new Date() } });
-    await notify({ userId: item.sellerId, title: 'Payment received', message: `The buyer paid $${Number(item.currentPrice).toFixed(2)} for "${item.title}".`, link: `/auctions/${id}` });
-    res.json({ data: { id, paidAt: paid.paidAt, amount: money(item.currentPrice) } });
   })
 );
 

@@ -2,7 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma';
 import { closeAuction } from '../src/modules/auctions/auction.service';
-import { app, createItem, createUser, loginAs, resetDb } from './helpers';
+import { app, checkout, createItem, createUser, loginAs, resetDb } from './helpers';
 
 beforeEach(resetDb);
 
@@ -66,17 +66,20 @@ describe('won auctions, payment and ratings', () => {
     expect(((await aliceAgent.get('/api/me/won').expect(200)).body.data as unknown[]).length).toBe(1);
     expect(((await bobAgent.get('/api/me/won').expect(200)).body.data as unknown[]).length).toBe(0);
 
-    await bobAgent.post(`/api/me/won/${item.id}/pay`).expect(404);
-    const paid = await aliceAgent.post(`/api/me/won/${item.id}/pay`).expect(200);
-    expect(paid.body.data.amount).toBe(80);
-    await aliceAgent.post(`/api/me/won/${item.id}/pay`).expect(409);
+    await checkout(bobAgent, item.id).then(res => expect(res.status).toBe(404));
+    const paid = await checkout(aliceAgent, item.id).then(res => {
+      expect(res.status).toBe(201);
+      return res;
+    });
+    expect(paid.body.data).toMatchObject({ amount: 165, receiptNo: 'BN-000001' });
+    await checkout(aliceAgent, item.id).then(res => expect(res.status).toBe(409));
     expect(await prisma.notification.count({ where: { userId: seller.id, title: 'Payment received' } })).toBe(1);
   });
 
   it('only allows one rating, and only after payment', async () => {
     const { item, aliceAgent, seller } = await winAuction();
     await aliceAgent.post(`/api/me/won/${item.id}/rating`).send({ score: 5 }).expect(400);
-    await aliceAgent.post(`/api/me/won/${item.id}/pay`).expect(200);
+    await checkout(aliceAgent, item.id).then(res => expect(res.status).toBe(201));
     await aliceAgent.post(`/api/me/won/${item.id}/rating`).send({ score: 6 }).expect(400);
     await aliceAgent.post(`/api/me/won/${item.id}/rating`).send({ score: 4, comment: 'Smooth deal' }).expect(201);
     await aliceAgent.post(`/api/me/won/${item.id}/rating`).send({ score: 5 }).expect(409);
