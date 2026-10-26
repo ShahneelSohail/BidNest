@@ -63,7 +63,7 @@ export interface ItemDetail extends ListItem {
   sellerRating: { average: number | null; count: number };
   rejectionReason: string | null;
   recentBids: Bid[];
-  viewer: { isSeller: boolean; isWatching: boolean; myHighestBid: number | null; isLeading: boolean; isWinner: boolean } | null;
+  viewer: { isSeller: boolean; isWatching: boolean; myHighestBid: number | null; myMaxBid: number | null; isLeading: boolean; isWinner: boolean } | null;
 }
 
 export interface BidPlaced {

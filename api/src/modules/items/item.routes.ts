@@ -6,12 +6,13 @@ import { prisma } from '../../lib/prisma';
 import { money } from '../../lib/serialize';
 import { currentUser, optionalAuth, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
-import { bidDto, bidInclude, placeBid } from '../auctions/auction.service';
+import { bidDto, bidInclude, placeBid, raiseMaximum } from '../auctions/auction.service';
 import { detailInclude, listInclude, toDetailItem, toListItem } from './item.dto';
 import { buildItemOrder, buildItemWhere, itemsQuerySchema, type ItemsQuery } from './item.query';
 
 const idParams = z.object({ id: z.coerce.number().int().positive() });
-const bidSchema = z.object({ amount: z.coerce.number().positive('Enter a bid amount') });
+const bidSchema = z.object({ amount: z.coerce.number().positive('Enter a bid amount'), maxAmount: z.coerce.number().positive().optional() });
+const maxBidSchema = z.object({ maxAmount: z.coerce.number().positive('Enter a maximum bid') });
 const suggestionQuery = z.object({ q: z.string().trim().min(1).max(100) });
 const SUGGESTION_LIMIT = 8;
 const RECENT_BIDS = 10;
@@ -62,10 +63,11 @@ itemRouter.get(
     if (!item || (!['ACTIVE', 'SOLD', 'EXPIRED'].includes(item.status) && !isPrivileged)) throw notFound('Item not found.');
     if (viewer?.id !== item.sellerId) await prisma.item.update({ where: { id }, data: { viewCount: { increment: 1 } } });
 
-    const [recentBids, watching, myBest, sellerRating] = await Promise.all([
+    const [recentBids, watching, myBest, myMax, sellerRating] = await Promise.all([
       prisma.bid.findMany({ where: { itemId: id }, orderBy: [{ amount: 'desc' }, { bidTime: 'asc' }], take: RECENT_BIDS, include: bidInclude }),
       viewer ? prisma.watchlist.findUnique({ where: { userId_itemId: { userId: viewer.id, itemId: id } } }) : null,
       viewer ? prisma.bid.findFirst({ where: { itemId: id, bidderId: viewer.id }, orderBy: { amount: 'desc' } }) : null,
+      viewer ? prisma.autoBid.findUnique({ where: { itemId_userId: { itemId: id, userId: viewer.id } } }) : null,
       prisma.rating.aggregate({ where: { ratedUserId: item.sellerId }, _avg: { score: true }, _count: { _all: true } }),
     ]);
 
@@ -80,6 +82,7 @@ itemRouter.get(
               isSeller: viewer.id === item.sellerId,
               isWatching: Boolean(watching),
               myHighestBid: money(myBest?.amount),
+              myMaxBid: money(myMax?.maxAmount),
               isLeading: item.currentBid?.bidderId === viewer.id,
               isWinner: item.status === 'SOLD' && item.currentBid?.bidderId === viewer.id,
             }
@@ -112,8 +115,19 @@ itemRouter.post(
   validate('body', bidSchema),
   asyncHandler(async (req, res) => {
     const { id } = req.params as unknown as z.infer<typeof idParams>;
-    const result = await placeBid(id, currentUser(req).id, req.body.amount);
+    const result = await placeBid(id, currentUser(req).id, req.body.amount, req.body.maxAmount);
     res.status(201).json({ data: result });
+  })
+);
+
+itemRouter.put(
+  '/:id/max-bid',
+  requireAuth,
+  validate('params', idParams),
+  validate('body', maxBidSchema),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as unknown as z.infer<typeof idParams>;
+    res.json({ data: await raiseMaximum(id, currentUser(req).id, req.body.maxAmount) });
   })
 );
 

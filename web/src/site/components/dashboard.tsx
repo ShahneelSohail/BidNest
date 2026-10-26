@@ -160,7 +160,7 @@ const BidCta = ({ item, size = 'sm', className }: { item: BidRow; size?: 'sm' | 
   }
   const owed = status === 'won' && !item.paid;
   const [label, href] = {
-    leading: ['View lot', `/auctions/${item.id}`],
+    leading: ['Raise max', `/auctions/${item.id}`],
     won: [owed ? 'Pay now' : 'View receipt', `/checkout/${item.id}`],
     lost: ['Similar lots', '/auctions'],
   }[status];

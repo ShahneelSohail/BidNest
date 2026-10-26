@@ -62,10 +62,57 @@ const SummaryRow = ({ label, value, strong, last }: { label: string; value: stri
   </div>
 );
 
+interface BidResult {
+  leading: boolean;
+  currentPrice: number;
+}
+
+const MaxField = ({ id, value, onChange, placeholder }: { id: string; value: string; onChange: (value: string) => void; placeholder: string }) => (
+  <div className="flex h-12 items-center gap-2 rounded-sm border border-gold-300/20 bg-surface px-4 transition focus-within:border-gold-300">
+    <span className="display text-xl text-muted">$</span>
+    <input id={id} value={value} onChange={event => onChange(event.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder={placeholder} aria-label="Maximum bid" className="min-w-0 flex-1 bg-transparent text-lg text-text tnum outline-none placeholder:text-muted" />
+    <span className="text-xs text-muted">USD</span>
+  </div>
+);
+
+const RaiseMaximum = ({ item }: { item: ItemDetail }) => {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState('');
+  const floor = Math.max(item.currentPrice, item.viewer?.myMaxBid ?? 0);
+  const raise = useMutation({
+    mutationFn: () => api.put<BidResult>(`/items/${item.id}/max-bid`, { maxAmount: Number(value) }),
+    onSuccess: () => {
+      setValue('');
+      toast('success', `Maximum raised to ${formatMoney(Number(value))}.`);
+      void queryClient.invalidateQueries({ queryKey: ['item', item.id] });
+    },
+    onError: failure => toast('error', failure.message),
+  });
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Eyebrow className="text-muted!">{item.viewer?.myMaxBid ? `Your maximum ${formatMoney(item.viewer.myMaxBid)}` : 'Bid automatically'}</Eyebrow>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <MaxField id={`raise-${item.id}`} value={value} onChange={setValue} placeholder={`More than ${floor.toLocaleString('en-US')}`} />
+        </div>
+        <Button variant="secondary" disabled={!value || Number(value) <= floor || raise.isPending} onClick={() => raise.mutate()} className="h-12">
+          {item.viewer?.myMaxBid ? 'Raise' : 'Set max'}
+        </Button>
+      </div>
+      <p className="text-xs text-muted">We bid for you in {formatMoney(item.bidIncrement)} steps, only as far as needed, and never above your maximum.</p>
+    </div>
+  );
+};
+
 const BidForm = ({ item, state }: { item: ItemDetail; state: BidState }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('idle');
+  const [useMax, setUseMax] = useState(false);
+  const [maxCustom, setMaxCustom] = useState('');
+  const [leading, setLeading] = useState(true);
   const [chipIndex, setChipIndex] = useState(0);
   const [custom, setCustom] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -76,12 +123,16 @@ const BidForm = ({ item, state }: { item: ItemDetail; state: BidState }) => {
     { label: '+ 5×', amount: item.currentPrice + item.bidIncrement * 5 },
   ];
   const amount = custom ? Number(custom) : chips[chipIndex]!.amount;
+  const maxAmount = useMax && maxCustom ? Number(maxCustom) : undefined;
 
   const placeBid = useMutation({
-    mutationFn: () => api.post(`/items/${item.id}/bids`, { amount }),
-    onSuccess: () => {
+    mutationFn: () => api.post<BidResult>(`/items/${item.id}/bids`, { amount, maxAmount }),
+    onSuccess: result => {
       setCustom('');
       setChipIndex(0);
+      setMaxCustom('');
+      setUseMax(false);
+      setLeading(result.leading);
       setStep('success');
       void queryClient.invalidateQueries({ queryKey: ['item', item.id] });
     },
@@ -102,14 +153,20 @@ const BidForm = ({ item, state }: { item: ItemDetail; state: BidState }) => {
       setError(`Bid at least ${formatMoney(item.nextMinimumBid)}`);
       return;
     }
+    if (useMax && !(maxAmount && maxAmount >= amount)) {
+      setError(`Your maximum must be at least ${formatMoney(amount)}`);
+      return;
+    }
     setError(null);
     setStep('confirm');
   };
 
   return (
     <>
-      {state === 'leading' && <Banner tone="live" title="You're the highest bidder">Your bid {formatMoney(item.viewer?.myHighestBid)}. We&apos;ll notify you if someone outbids you.</Banner>}
+      {state === 'leading' && <Banner tone="live" title="You're the highest bidder">Your bid {formatMoney(item.viewer?.myHighestBid)}{item.viewer?.myMaxBid ? ` · maximum ${formatMoney(item.viewer.myMaxBid)}` : ''}. We&apos;ll notify you if someone outbids you.</Banner>}
       {state === 'outbid' && <Banner tone="outbid" title="You've been outbid">Your highest bid {formatMoney(item.viewer?.myHighestBid)}. Bid {formatMoney(item.nextMinimumBid)} to lead again.</Banner>}
+
+      {state === 'leading' && step === 'idle' && <RaiseMaximum item={item} />}
 
       {step === 'idle' && (
         <>
@@ -138,6 +195,13 @@ const BidForm = ({ item, state }: { item: ItemDetail; state: BidState }) => {
             </div>
             {error && <p role="alert" className="text-[13px] text-danger">{error}</p>}
           </div>
+          <div className="flex flex-col gap-2">
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-2">
+              <input type="checkbox" checked={useMax} onChange={event => { setUseMax(event.target.checked); setError(null); }} className="size-4 accent-[#e7d393]" />
+              Bid automatically up to a maximum
+            </label>
+            {useMax && <MaxField id={`max-${item.id}`} value={maxCustom} onChange={setMaxCustom} placeholder={`${amount.toLocaleString('en-US')} or more`} />}
+          </div>
           <Button size="lg" onClick={review} className="w-full text-base tnum active:scale-[0.985]">
             Place bid · {formatMoney(amount)}
           </Button>
@@ -153,7 +217,8 @@ const BidForm = ({ item, state }: { item: ItemDetail; state: BidState }) => {
           </div>
           <div className="flex flex-col">
             <SummaryRow label="Current bid" value={formatMoney(item.currentPrice)} />
-            <SummaryRow label="Your bid" value={formatMoney(amount)} strong last />
+            <SummaryRow label="Your bid" value={formatMoney(amount)} strong last={!maxAmount} />
+            {maxAmount && <SummaryRow label="Your maximum" value={formatMoney(maxAmount)} strong last />}
           </div>
           <p className="text-[13px] leading-relaxed text-text-2">This bid is binding. If you win, you&apos;ll be asked to complete payment.</p>
           <div className="grid grid-cols-[1fr_2fr] gap-2">
@@ -172,7 +237,7 @@ const BidForm = ({ item, state }: { item: ItemDetail; state: BidState }) => {
         <div className="flex flex-col items-center gap-3.5 pt-5 pb-3 text-center">
           <CheckDraw />
           <p className="display text-3xl">Bid placed</p>
-          <p className="text-sm text-text-2 tnum">You lead at {formatMoney(item.currentPrice)}.</p>
+          <p className="text-sm text-text-2 tnum">{leading ? `You lead at ${formatMoney(item.currentPrice)}.` : `Outbid right away: a higher maximum is in place at ${formatMoney(item.currentPrice)}.`}</p>
         </div>
       )}
     </>

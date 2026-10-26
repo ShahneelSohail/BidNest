@@ -101,3 +101,29 @@ test('a buyer can follow up on a support thread and the admin sees it', async ({
   await admin.getByText('Listing was rejected').first().click();
   await expect(admin.getByText(followUp).first()).toBeVisible();
 });
+
+test('a maximum bid defends the lead against a rival bid', async ({ browser }) => {
+  const rival = await (await browser.newContext()).newPage();
+  const bidder = await (await browser.newContext()).newPage();
+  await logIn(bidder, 'noah@bidnest.test');
+  await bidder.goto('/auctions?q=Polaroid');
+  await bidder.locator(lotLinks).first().click();
+  await bidder.waitForURL(/\/auctions\/\d+$/, { waitUntil: 'commit' });
+  await bidder.getByLabel('Bid automatically up to a maximum').check();
+  const placeBid = bidder.getByRole('button', { name: /Place bid · \$/ }).first();
+  const minimum = Number(((await placeBid.textContent()) ?? '').split('$')[1]!.replace(/,/g, ''));
+  await bidder.getByLabel('Maximum bid').fill(String(minimum + 500));
+  await placeBid.click();
+  await bidder.getByRole('button', { name: 'Confirm bid' }).click();
+  await expect(bidder.getByText('Bid placed').first()).toBeVisible();
+
+  await logIn(rival, 'kai@bidnest.test');
+  await rival.goto(bidder.url());
+  await rival.getByRole('button', { name: /Place bid · \$/ }).first().click();
+  await rival.getByRole('button', { name: 'Confirm bid' }).click();
+  await expect(rival.getByText(/Outbid right away/)).toBeVisible();
+
+  await bidder.reload();
+  await expect(bidder.getByText(/You're the highest bidder/).first()).toBeVisible();
+  await expect(bidder.getByText(`maximum $${(minimum + 500).toLocaleString('en-US')}.00`).first()).toBeVisible();
+});

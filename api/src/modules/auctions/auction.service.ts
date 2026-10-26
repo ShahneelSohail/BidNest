@@ -34,15 +34,93 @@ const lockItem = async (tx: Tx, itemId: number) => {
   await tx.$queryRaw`SELECT id FROM "Item" WHERE id = ${itemId} FOR UPDATE`;
 };
 
-export const placeBid = async (itemId: number, bidderId: number, amount: number) => {
-  const result = await prisma.$transaction(async tx => {
-    await lockItem(tx, itemId);
-    const item = await tx.item.findUnique({ where: { id: itemId } });
-    if (!item) throw notFound('Item not found.');
-    if (item.endDate <= new Date()) throw badRequest('This auction has ended.');
-    if (item.status !== 'ACTIVE') throw badRequest('This auction is not active.');
-    if (item.sellerId === bidderId) throw badRequest('You cannot bid on your own item.');
+interface PlacedBid {
+  bid: BidRecord;
+  previousLeaderId: number | null;
+}
 
+const recordBid = async (tx: Tx, itemId: number, bidderId: number, amount: number): Promise<PlacedBid> => {
+  const previousLeader = await tx.bid.findFirst({ where: { itemId, isWinning: true } });
+  await tx.bid.updateMany({ where: { itemId, isWinning: true }, data: { isWinning: false } });
+  const bid = await tx.bid.create({ data: { itemId, bidderId, amount, isWinning: true }, include: bidInclude });
+  await tx.item.update({ where: { id: itemId }, data: { currentPrice: amount, currentBidId: bid.id } });
+  return { bid, previousLeaderId: previousLeader?.bidderId ?? null };
+};
+
+// Each round lets the strongest rival maximum answer the current leader. The
+// higher maximum wins at one increment above the lower one; the lower maximum
+// is shown in the ledger as the bid it stopped at.
+const resolveProxies = async (tx: Tx, itemId: number): Promise<PlacedBid[]> => {
+  const placed: PlacedBid[] = [];
+  const caps = await tx.autoBid.findMany({ where: { itemId }, orderBy: [{ maxAmount: 'desc' }, { createdAt: 'asc' }] });
+  for (let round = 0; round <= caps.length; round++) {
+    const item = await tx.item.findUniqueOrThrow({ where: { id: itemId } });
+    const leader = await tx.bid.findFirstOrThrow({ where: { itemId, isWinning: true } });
+    const price = Number(item.currentPrice);
+    const step = Number(item.bidIncrement);
+    const challenger = caps.find(cap => cap.userId !== leader.bidderId && Number(cap.maxAmount) >= price + step);
+    if (!challenger) break;
+
+    const leaderAuto = caps.find(cap => cap.userId === leader.bidderId);
+    const leaderCap = Math.max(price, Number(leaderAuto?.maxAmount ?? 0));
+    const challengerCap = Number(challenger.maxAmount);
+    const challengerWins = challengerCap > leaderCap || (challengerCap === leaderCap && leaderAuto !== undefined && challenger.createdAt < leaderAuto.createdAt);
+    const [winnerId, winnerCap, loserId, loserCap] =
+      challengerWins ? [challenger.userId, challengerCap, leader.bidderId, leaderCap] : [leader.bidderId, leaderCap, challenger.userId, challengerCap];
+    const finalPrice = Math.min(winnerCap, loserCap + step);
+    if (finalPrice > loserCap && loserCap > price) placed.push(await recordBid(tx, itemId, loserId, loserCap));
+    placed.push(await recordBid(tx, itemId, winnerId, finalPrice));
+  }
+  return placed;
+};
+
+const loadBiddableItem = async (tx: Tx, itemId: number, bidderId: number) => {
+  await lockItem(tx, itemId);
+  const item = await tx.item.findUnique({ where: { id: itemId } });
+  if (!item) throw notFound('Item not found.');
+  if (item.endDate <= new Date()) throw badRequest('This auction has ended.');
+  if (item.status !== 'ACTIVE') throw badRequest('This auction is not active.');
+  if (item.sellerId === bidderId) throw badRequest('You cannot bid on your own item.');
+  return item;
+};
+
+const saveMaximum = (tx: Tx, itemId: number, userId: number, maxAmount: number) =>
+  tx.autoBid.upsert({ where: { itemId_userId: { itemId, userId } }, create: { itemId, userId, maxAmount }, update: { maxAmount } });
+
+const announce = async (itemId: number, bidderId: number, placed: PlacedBid[]) => {
+  const item = await prisma.item.findUniqueOrThrow({
+    where: { id: itemId },
+    select: { title: true, sellerId: true, currentPrice: true, currentBidId: true, minBid: true, bidIncrement: true, endDate: true },
+  });
+  const link = `/auctions/${itemId}`;
+  const payloads = placed.map(({ bid }) => ({
+    bid: bidDto(bid),
+    currentPrice: money(bid.amount),
+    nextMinimumBid: Number(bid.amount) + Number(item.bidIncrement),
+    endDate: item.endDate,
+  }));
+  payloads.forEach(payload => emitToAuction(itemId, 'bid:placed', payload));
+
+  for (const { bid, previousLeaderId } of placed) {
+    if (previousLeaderId && previousLeaderId !== bid.bidderId) {
+      await notify({ userId: previousLeaderId, title: 'You have been outbid', message: `Someone bid ${usd(bid.amount)} on "${item.title}".`, link });
+    }
+  }
+  await notify({ userId: item.sellerId, title: 'New bid on your item', message: `"${item.title}" received a bid of ${usd(item.currentPrice)}.`, link });
+
+  return {
+    bid: payloads[payloads.length - 1]!.bid,
+    currentPrice: money(item.currentPrice),
+    nextMinimumBid: nextMinimumBid(item),
+    endDate: item.endDate,
+    leading: placed[placed.length - 1]!.bid.bidderId === bidderId,
+  };
+};
+
+export const placeBid = async (itemId: number, bidderId: number, amount: number, maxAmount?: number) => {
+  if (maxAmount !== undefined && maxAmount < amount) throw badRequest('Your maximum must be at least your bid.');
+  const placed = await prisma.$transaction(async tx => {
+    const item = await loadBiddableItem(tx, itemId, bidderId);
     const minimum = nextMinimumBid(item);
     if (amount < minimum) throw badRequest(`Bid must be at least ${usd(minimum)}.`);
 
@@ -51,42 +129,33 @@ export const placeBid = async (itemId: number, bidderId: number, amount: number)
       throw badRequest(`You already have a higher bid of ${usd(ownBest.amount)}.`);
     }
 
-    const previousLeader = await tx.bid.findFirst({ where: { itemId, isWinning: true } });
-    await tx.bid.updateMany({ where: { itemId, isWinning: true }, data: { isWinning: false } });
-    const bid = await tx.bid.create({ data: { itemId, bidderId, amount, isWinning: true }, include: bidInclude });
-    const updated = await tx.item.update({
-      where: { id: itemId },
-      data: { currentPrice: amount, currentBidId: bid.id },
-      select: { title: true, sellerId: true, currentPrice: true, currentBidId: true, minBid: true, bidIncrement: true, endDate: true },
-    });
-    return { bid, item: updated, previousLeaderId: previousLeader?.bidderId ?? null };
+    const manual = await recordBid(tx, itemId, bidderId, amount);
+    if (maxAmount !== undefined && maxAmount > amount) await saveMaximum(tx, itemId, bidderId, maxAmount);
+    return [manual, ...(await resolveProxies(tx, itemId))];
   });
+  return announce(itemId, bidderId, placed);
+};
 
-  const payload = {
-    bid: bidDto(result.bid),
-    currentPrice: money(result.item.currentPrice),
-    nextMinimumBid: nextMinimumBid(result.item),
-    endDate: result.item.endDate,
-  };
-  emitToAuction(itemId, 'bid:placed', payload);
+export const raiseMaximum = async (itemId: number, bidderId: number, maxAmount: number) => {
+  const placed = await prisma.$transaction(async tx => {
+    const item = await loadBiddableItem(tx, itemId, bidderId);
+    const leader = await tx.bid.findFirst({ where: { itemId, isWinning: true } });
+    if (leader?.bidderId !== bidderId) {
+      const minimum = nextMinimumBid(item);
+      if (maxAmount < minimum) throw badRequest(`Your maximum must be at least ${usd(minimum)}.`);
+      const manual = await recordBid(tx, itemId, bidderId, minimum);
+      if (maxAmount > minimum) await saveMaximum(tx, itemId, bidderId, maxAmount);
+      return [manual, ...(await resolveProxies(tx, itemId))];
+    }
 
-  const link = `/auctions/${itemId}`;
-  if (result.previousLeaderId && result.previousLeaderId !== bidderId) {
-    await notify({
-      userId: result.previousLeaderId,
-      title: 'You have been outbid',
-      message: `Someone bid ${usd(amount)} on "${result.item.title}".`,
-      link,
-    });
-  }
-  await notify({
-    userId: result.item.sellerId,
-    title: 'New bid on your item',
-    message: `"${result.item.title}" received a bid of ${usd(amount)}.`,
-    link,
+    const current = await tx.autoBid.findUnique({ where: { itemId_userId: { itemId, userId: bidderId } } });
+    const floor = Math.max(Number(item.currentPrice), Number(current?.maxAmount ?? 0));
+    if (maxAmount <= floor) throw badRequest(`Your maximum must be higher than ${usd(floor)}.`);
+    await saveMaximum(tx, itemId, bidderId, maxAmount);
+    return resolveProxies(tx, itemId);
   });
-
-  return payload;
+  if (placed.length === 0) return { leading: true, maxAmount };
+  return { ...(await announce(itemId, bidderId, placed)), maxAmount };
 };
 
 export const closeAuction = async (itemId: number) => {

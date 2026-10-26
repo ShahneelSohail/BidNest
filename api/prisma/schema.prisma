@@ -44,6 +44,7 @@ model User {
   addresses       Address[]
   orders          Order[]
   preferences     NotificationPreference[]
+  autoBids        AutoBid[]
   bids            Bid[]
   watchlist       Watchlist[]
   notifications   Notification[]
@@ -93,6 +94,7 @@ model Item {
   documents       ItemDocument[]
   watchers        Watchlist[]
   ratings         Rating[]
+  autoBids        AutoBid[]
 
   @@index([status, endDate])
   @@index([sellerId])
@@ -247,4 +249,16 @@ model NotificationPreference {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, event, channel])
+}
+
+model AutoBid {
+  id        Int      @id @default(autoincrement())
+  itemId    Int
+  userId    Int
+  maxAmount Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, userId])
 }
