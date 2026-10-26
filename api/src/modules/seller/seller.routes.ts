@@ -75,6 +75,7 @@ sellerRouter.get(
         stats: {
           activeListings: countOf('ACTIVE'),
           pendingListings: countOf('PENDING'),
+          draftListings: countOf('DRAFT'),
           soldItems: countOf('SOLD'),
           totalEarnings,
           averageSellingPrice: sold.length ? totalEarnings / sold.length : 0,
@@ -130,7 +131,7 @@ sellerRouter.post(
   validate('body', createItemSchema),
   asyncHandler(async (req, res) => {
     const files = uploadedFiles(req);
-    const { title, description, categoryId, minBid, durationDays, condition, increment } = req.body as CreateBody;
+    const { title, description, categoryId, minBid, durationDays, condition, increment, draft } = req.body as CreateBody;
     try {
       if (categoryId && !(await prisma.category.findFirst({ where: { id: categoryId, isActive: true } }))) {
         throw badRequest('Choose a valid category.');
@@ -148,7 +149,7 @@ sellerRouter.post(
           bidIncrement: bidIncrementFor(minBid, increment),
           startDate: new Date(now),
           endDate: new Date(now + durationDays * MS_PER_DAY),
-          status: 'PENDING',
+          status: draft ? 'DRAFT' : 'PENDING',
           images: { create: files.map((file, index) => ({ url: uploadedPath(file), isPrimary: index === 0 })) },
         },
         include: detailInclude,
@@ -172,7 +173,7 @@ sellerRouter.patch(
     const { title, description, categoryId, minBid, removeImageIds, condition, increment } = req.body as UpdateBody;
     try {
       const item = await ownItem(id, currentUser(req).id);
-      if (item.status !== 'PENDING') throw badRequest('You can only edit items that are pending approval.');
+      if (item.status !== 'PENDING' && item.status !== 'DRAFT') throw badRequest('You can only edit drafts and items that are pending approval.');
       if (categoryId && !(await prisma.category.findFirst({ where: { id: categoryId, isActive: true } }))) {
         throw badRequest('Choose a valid category.');
       }
@@ -208,6 +209,26 @@ sellerRouter.patch(
       await removeUploads(files.map(uploadedPath));
       throw error;
     }
+  })
+);
+
+sellerRouter.post(
+  '/items/:id/submit',
+  validate('params', itemIdParams),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as unknown as Params;
+    const item = await ownItem(id, currentUser(req).id);
+    if (item.status !== 'DRAFT') throw badRequest('Only drafts can be submitted for approval.');
+    if ((await prisma.itemImage.count({ where: { itemId: id } })) === 0) throw badRequest('Add at least one photo before submitting.');
+
+    const now = Date.now();
+    const duration = item.endDate.getTime() - item.startDate.getTime();
+    const submitted = await prisma.item.update({
+      where: { id },
+      data: { status: 'PENDING', startDate: new Date(now), endDate: new Date(now + duration) },
+      include: detailInclude,
+    });
+    res.json({ data: toDetailItem(submitted) });
   })
 );
 
@@ -301,6 +322,7 @@ sellerRouter.get(
         totalListings: items.length,
         activeListings: items.filter(item => item.status === 'ACTIVE').length,
         pendingListings: items.filter(item => item.status === 'PENDING').length,
+        draftListings: items.filter(item => item.status === 'DRAFT').length,
         rejectedListings: items.filter(item => item.status === 'REJECTED').length,
         expiredListings: items.filter(item => item.status === 'EXPIRED').length,
         totalViews: items.reduce((sum, item) => sum + item.viewCount, 0),

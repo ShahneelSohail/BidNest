@@ -13,6 +13,7 @@ enum Role {
 }
 
 enum ItemStatus {
+  DRAFT
   PENDING
   ACTIVE
   REJECTED

@@ -184,3 +184,43 @@ describe('seller dashboard and analytics', () => {
     expect(monthTotal).toBe(500);
   });
 });
+
+describe('draft listings', () => {
+  it('saves a draft without photos, keeps it private and lets the seller edit, submit and delete it', async () => {
+    const seller = await createUser();
+    const agent = await loginAs(seller.email);
+    const admin = await loginAs((await createUser({ role: 'ADMIN' })).email);
+
+    const created = await createListing(agent, listing({ draft: 'true' }), 0);
+    expect(created.status).toBe(201);
+    expect(created.body.data.status).toBe('draft');
+    const id = created.body.data.id as number;
+
+    await request(app).get(`/api/items/${id}`).expect(404);
+    expect(((await request(app).get('/api/items?status=all').expect(200)).body.data as unknown[]).length).toBe(0);
+    expect(((await admin.get('/api/admin/approvals').expect(200)).body.data as unknown[]).length).toBe(0);
+    expect(((await admin.get('/api/admin/items').expect(200)).body.data as unknown[]).length).toBe(0);
+    expect(((await agent.get('/api/seller/items?status=draft').expect(200)).body.data as unknown[]).length).toBe(1);
+    expect((await agent.get('/api/seller/dashboard').expect(200)).body.data.stats.draftListings).toBe(1);
+
+    await agent.patch(`/api/seller/items/${id}`).field('title', 'Brass desk lamp, 1930s').field('minBid', '55').expect(200);
+    await agent.post(`/api/seller/items/${id}/submit`).expect(400);
+
+    await agent.patch(`/api/seller/items/${id}`).field('title', 'Brass desk lamp, 1930s').field('minBid', '55').attach('images', PNG, { filename: 'lamp.png', contentType: 'image/png' }).expect(200);
+    const submitted = await agent.post(`/api/seller/items/${id}/submit`).expect(200);
+    expect(submitted.body.data.status).toBe('pending');
+    expect(((await admin.get('/api/admin/approvals').expect(200)).body.data as unknown[]).length).toBe(1);
+    await agent.post(`/api/seller/items/${id}/submit`).expect(400);
+  });
+
+  it('does not let another seller touch or submit a draft, and deletes unsubmitted drafts', async () => {
+    const [owner, other] = await Promise.all([createUser(), createUser()]);
+    const ownerAgent = await loginAs(owner.email);
+    const id = (await createListing(ownerAgent, listing({ draft: 'true' }), 0)).body.data.id as number;
+
+    const otherAgent = await loginAs(other.email);
+    await otherAgent.post(`/api/seller/items/${id}/submit`).expect(403);
+    await otherAgent.patch(`/api/seller/items/${id}`).field('title', 'Hijacked lamp title').field('minBid', '10').expect(403);
+    await ownerAgent.delete(`/api/seller/items/${id}`).expect(204);
+  });
+});

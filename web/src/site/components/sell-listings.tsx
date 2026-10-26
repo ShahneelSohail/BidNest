@@ -28,14 +28,15 @@ interface ListingAction {
 
 const menuKeys: Record<ItemStatus, ActionKey[]> = {
   active: ['view', 'extend', 'edit', 'end', 'delete'],
+  draft: ['edit', 'delete'],
   pending: ['view', 'edit', 'delete'],
   rejected: ['feedback', 'delete'],
   sold: ['view'],
   expired: ['relist', 'edit', 'delete'],
 };
 
-const primaryKey: Record<ItemStatus, ActionKey> = { active: 'extend', pending: 'edit', rejected: 'feedback', sold: 'view', expired: 'relist' };
-const primaryLabel: Record<ItemStatus, string> = { active: 'Extend', pending: 'Edit', rejected: 'View feedback', sold: 'View', expired: 'Relist' };
+const primaryKey: Record<ItemStatus, ActionKey> = { draft: 'edit', active: 'extend', pending: 'edit', rejected: 'feedback', sold: 'view', expired: 'relist' };
+const primaryLabel: Record<ItemStatus, string> = { draft: 'Continue', active: 'Extend', pending: 'Edit', rejected: 'View feedback', sold: 'View', expired: 'Relist' };
 
 const menuItemClass = (action: ListingAction) =>
   cx(
@@ -109,9 +110,9 @@ const RowActions = ({ item, compact }: { item: SellerItem; compact?: boolean }) 
     feedback: { label: 'View feedback', icon: 'flag', href: `/sell/${item.id}` },
     extend: { label: 'Extend 24 hours', icon: 'clock', run: () => extend.mutate(24) },
     relist: { label: 'Relist for 7 days', icon: 'redo', run: () => extend.mutate(168) },
-    edit: { label: 'Edit listing', icon: 'edit', href: `/sell/${item.id}/edit`, lockedHint: item.status === 'pending' ? undefined : 'Only listings awaiting approval can be edited' },
+    edit: { label: 'Edit listing', icon: 'edit', href: `/sell/${item.id}/edit`, lockedHint: item.status === 'pending' || item.status === 'draft' ? undefined : 'Only drafts and listings awaiting approval can be edited' },
     end: { label: item.hasBids ? 'End now and sell' : 'End early', icon: 'stop', danger: true, separated: true, run: () => setDialog('end') },
-    delete: { label: item.status === 'pending' ? 'Withdraw and delete' : 'Delete', icon: 'trash', danger: true, separated: true, lockedHint: item.hasBids ? 'Lots with bids can’t be deleted' : undefined, run: () => setDialog('delete') },
+    delete: { label: item.status === 'pending' ? 'Withdraw and delete' : item.status === 'draft' ? 'Discard draft' : 'Delete', icon: 'trash', danger: true, separated: true, lockedHint: item.hasBids ? 'Lots with bids can’t be deleted' : undefined, run: () => setDialog('delete') },
   };
   const primary = actions[primaryKey[item.status]];
   const primaryClass = cx(
@@ -180,7 +181,7 @@ const RowActions = ({ item, compact }: { item: SellerItem; compact?: boolean }) 
 
 const statusNote = (item: SellerItem): ReactNode => {
   if (item.status === 'active') return <Countdown endDate={item.endDate} />;
-  const notes: Record<Exclude<ItemStatus, 'active'>, string> = { pending: 'Awaiting review', rejected: 'Sent back', sold: `Sold ${formatDate(item.endDate)}`, expired: `Ended ${formatDate(item.endDate)}` };
+  const notes: Record<Exclude<ItemStatus, 'active'>, string> = { draft: 'Not submitted', pending: 'Awaiting review', rejected: 'Sent back', sold: `Sold ${formatDate(item.endDate)}`, expired: `Ended ${formatDate(item.endDate)}` };
   return <span className={item.status === 'rejected' ? 'text-danger' : 'text-muted'}>{notes[item.status]}</span>;
 };
 
@@ -195,7 +196,7 @@ const Thumb = ({ item, size }: { item: SellerItem; size: string }) =>
 
 const priceLabelOf = (item: SellerItem) => (item.status === 'sold' ? 'Hammer' : item.hasBids ? 'Current' : 'Opening');
 const priceColorOf = (item: SellerItem) => (item.status === 'active' || item.status === 'sold' ? 'text-gold-300' : 'text-text-2');
-const hasBidData = (item: SellerItem) => item.status !== 'pending' && item.status !== 'rejected';
+const hasBidData = (item: SellerItem) => item.status !== 'draft' && item.status !== 'pending' && item.status !== 'rejected';
 
 const columns = [
   { label: 'Lot', align: 'text-left' },

@@ -20,6 +20,7 @@ export interface SellerAnalytics {
   totalListings: number;
   activeListings: number;
   pendingListings: number;
+  draftListings: number;
   rejectedListings: number;
   expiredListings: number;
   soldItems: number;
@@ -32,7 +33,7 @@ export interface SellerAnalytics {
   recentSales: ListItem[];
 }
 
-export const statusLabels: Record<StatusFilter, string> = { all: 'All', active: 'Live', pending: 'Pending', sold: 'Sold', expired: 'Unsold', rejected: 'Rejected' };
+export const statusLabels: Record<StatusFilter, string> = { all: 'All', draft: 'Drafts', active: 'Live', pending: 'Pending', sold: 'Sold', expired: 'Unsold', rejected: 'Rejected' };
 
 export const statusFilters = Object.keys(statusLabels) as StatusFilter[];
 
@@ -53,6 +54,7 @@ export const invalidateSeller = (queryClient: QueryClient) => queryClient.invali
 
 export const countsOf = (analytics: SellerAnalytics): Record<StatusFilter, number> => ({
   all: analytics.totalListings,
+  draft: analytics.draftListings,
   active: analytics.activeListings,
   pending: analytics.pendingListings,
   sold: analytics.soldItems,

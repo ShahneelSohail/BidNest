@@ -22,6 +22,7 @@ const listingFields = {
 
 export const createItemSchema = z.object({
   ...listingFields,
+  draft: z.preprocess(value => value === 'true' || value === true, z.boolean()).default(false),
   durationDays: z.coerce.number().int().min(MIN_DURATION_DAYS, 'Auction duration must be between 1 and 30 days').max(MAX_DURATION_DAYS, 'Auction duration must be between 1 and 30 days'),
 });
 
@@ -33,7 +34,7 @@ const idList = z.preprocess(
 export const updateItemSchema = z.object({ ...listingFields, removeImageIds: idList });
 
 export const sellerItemsQuery = pageQuery.extend({
-  status: z.enum(['all', 'pending', 'active', 'sold', 'expired', 'rejected']).default('all'),
+  status: z.enum(['all', 'draft', 'pending', 'active', 'sold', 'expired', 'rejected']).default('all'),
 });
 
 export const analyticsQuery = z.object({ days: z.coerce.number().refine(value => [30, 90, 365].includes(value), 'Choose 30, 90 or 365 days').default(30) });

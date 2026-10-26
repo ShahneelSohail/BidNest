@@ -72,7 +72,7 @@ itemsRouter.get(
   asyncHandler(async (req, res) => {
     const query = req.query as unknown as z.infer<typeof itemsQuery>;
     const where: Prisma.ItemWhereInput = {
-      ...(query.status === 'all' ? {} : { status: query.status }),
+      ...(query.status === 'all' ? { status: { not: 'DRAFT' as const } } : { status: query.status }),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.q
         ? { OR: [{ title: { contains: query.q, mode: 'insensitive' } }, { seller: { username: { contains: query.q, mode: 'insensitive' } } }] }

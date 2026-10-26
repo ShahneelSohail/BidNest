@@ -63,6 +63,7 @@ export const PageHeading = ({ eyebrow, title, action }: { eyebrow?: string; titl
 
 const statusStyles: Record<ItemStatus, string> = {
   active: 'bg-live/12 text-live',
+  draft: 'bg-white/8 text-text-2',
   pending: 'bg-outbid/12 text-outbid',
   sold: 'bg-info/12 text-info',
   expired: 'bg-white/8 text-ended',

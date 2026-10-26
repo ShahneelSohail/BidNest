@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
 import { formatMoney } from '../lib/format';
@@ -27,6 +28,7 @@ interface Draft {
   confirmed: boolean;
 }
 
+const MIN_DRAFT_TITLE = 5;
 const STEPS = ['Details', 'Photos', 'Pricing & duration', 'Review'];
 const LAST_STEP = STEPS.length - 1;
 const TITLE_MIN = 10;
@@ -351,7 +353,9 @@ const Done = ({ mode, lot, title, days, onAnother }: { mode: Mode; lot: string; 
 
 const Wizard = ({ mode, source, categories, onAnother }: { mode: Mode; source?: ItemDetail; categories: Category[]; onAnother?: () => void }) => {
   const toast = useToast();
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const isDraftSource = source?.status === 'draft';
   const [draft, setDraft] = useState<Draft>(() => (source ? draftFromItem(source, mode) : emptyDraft));
   const [step, setStep] = useState(0);
   const [touched, setTouched] = useState(false);
@@ -365,17 +369,17 @@ const Wizard = ({ mode, source, categories, onAnother }: { mode: Mode; source?: 
   };
 
   const submit = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (asDraft: boolean) => {
       const original = source ? [...source.images].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)) : [];
       const photosUnchanged = mode === 'edit' && draft.photos.length === original.length && draft.photos.every((photo, index) => photo.existingId === original[index]?.id);
       const fields: Record<string, string> = {
         title: draft.title.trim(),
         description: draft.description.trim(),
-        categoryId: String(draft.categoryId),
-        condition: draft.condition,
+        ...(draft.categoryId !== null && { categoryId: String(draft.categoryId) }),
+        ...(draft.condition && { condition: draft.condition }),
         minBid: String(draft.openingBid),
         increment: String(draft.increment),
-        ...(mode === 'new' && { durationDays: String(draft.durationDays) }),
+        ...(mode === 'new' && { durationDays: String(draft.durationDays), draft: String(asDraft) }),
       };
       const form = new FormData();
       Object.entries(fields).forEach(([name, value]) => form.append(name, value));
@@ -383,23 +387,34 @@ const Wizard = ({ mode, source, categories, onAnother }: { mode: Mode; source?: 
         original.forEach(image => form.append('removeImageIds', String(image.id)));
         (await Promise.all(draft.photos.map(photoFile))).forEach(file => form.append('images', file));
       }
-      return mode === 'edit' ? api.patch<ItemDetail>(`/seller/items/${source!.id}`, form) : api.post<ItemDetail>('/seller/items', form);
+      const result = mode === 'edit' ? await api.patch<ItemDetail>(`/seller/items/${source!.id}`, form) : await api.post<ItemDetail>('/seller/items', form);
+      return !asDraft && isDraftSource ? api.post<ItemDetail>(`/seller/items/${result.id}/submit`) : result;
     },
-    onSuccess: item => {
-      toast('success', mode === 'edit' ? 'Listing updated.' : 'Listing submitted for approval.');
+    onSuccess: (item, asDraft) => {
       void invalidateSeller(queryClient);
+      if (asDraft) {
+        toast('success', 'Draft saved.');
+        router.push('/sell?status=draft');
+        return;
+      }
+      toast('success', mode === 'edit' && !isDraftSource ? 'Listing updated.' : 'Listing submitted for approval.');
       setSaved(item);
     },
   });
 
-  if (saved) return <Done mode={mode} lot={lotNumber(saved.id)} title={saved.title} days={draft.durationDays} onAnother={onAnother} />;
+  if (saved) return <Done mode={isDraftSource ? 'new' : mode} lot={lotNumber(saved.id)} title={saved.title} days={draft.durationDays} onAnother={onAnother} />;
 
   const next = () => {
     if (hasErrors(errorsFor(step, draft))) return setTouched(true);
     if (step < LAST_STEP) return go(step + 1);
-    submit.mutate();
+    submit.mutate(false);
   };
-  const nextLabel = submit.isPending ? 'Submitting…' : step === LAST_STEP ? (mode === 'edit' ? 'Save changes' : 'Submit for review') : `Continue to ${STEPS[step + 1]!.toLowerCase()}`;
+  const saveDraft = () => {
+    if (draft.title.trim().length < MIN_DRAFT_TITLE || draft.openingBid <= 0) return toast('error', `Add a title (${MIN_DRAFT_TITLE}+ characters) and an opening bid to save a draft.`);
+    submit.mutate(true);
+  };
+  const canSaveDraft = mode === 'new' || isDraftSource;
+  const nextLabel = submit.isPending ? 'Submitting…' : step === LAST_STEP ? (mode === 'edit' && !isDraftSource ? 'Save changes' : 'Submit for review') : `Continue to ${STEPS[step + 1]!.toLowerCase()}`;
   const stepProps: StepProps = { draft, patch, errors };
   const lot = source && mode === 'edit' ? lotNumber(source.id) : 'Lot new';
 
@@ -407,7 +422,7 @@ const Wizard = ({ mode, source, categories, onAnother }: { mode: Mode; source?: 
     <div className="grid gap-16 pb-20 lg:grid-cols-[minmax(0,1fr)_340px] lg:pb-0">
       <div className="flex min-w-0 flex-col gap-8 lg:gap-10">
         <div className="flex flex-col gap-3.5">
-          <Eyebrow>{mode === 'edit' ? `Editing ${lot}` : 'New listing'}</Eyebrow>
+          <Eyebrow>{isDraftSource ? `Draft · ${lot}` : mode === 'edit' ? `Editing ${lot}` : 'New listing'}</Eyebrow>
           <h1 className="display text-5xl md:text-7xl md:leading-none">{mode === 'edit' ? 'Edit listing.' : 'List a lot.'}</h1>
         </div>
         <Stepper step={step} onGo={go} />
@@ -431,6 +446,11 @@ const Wizard = ({ mode, source, categories, onAnother }: { mode: Mode; source?: 
             <Icon name="back" />
             Back
           </Button>
+          {canSaveDraft && (
+            <Button variant="secondary" size="lg" disabled={submit.isPending} onClick={saveDraft} className="lg:ml-auto">
+              Save draft
+            </Button>
+          )}
           <Button variant={step === LAST_STEP ? 'gold' : 'primary'} size="lg" disabled={submit.isPending} onClick={next} className="flex-1 lg:flex-none">
             {submit.isPending && <span className="size-4 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />}
             {nextLabel}
@@ -456,8 +476,8 @@ export const ListingForm = ({ mode, sourceId }: { mode: Mode; sourceId?: number 
 
   if (sourceId !== undefined && source.isPending) return <Spinner />;
   if (source.error) return <ErrorState message={source.error.message} />;
-  if (mode === 'edit' && source.data?.status !== 'pending') {
-    return <EmptyState title="Only pending listings can be edited" hint="Once a listing has been reviewed it can no longer be changed." action={<LinkButton href="/sell">Back to listings</LinkButton>} />;
+  if (mode === 'edit' && source.data?.status !== 'pending' && source.data?.status !== 'draft') {
+    return <EmptyState title="Only drafts and pending listings can be edited" hint="Once a listing has been reviewed it can no longer be changed." action={<LinkButton href="/sell">Back to listings</LinkButton>} />;
   }
   if (categories.error) return <ErrorState message={categories.error.message} />;
   if (categories.isPending) return <Spinner />;

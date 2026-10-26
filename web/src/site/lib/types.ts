@@ -1,4 +1,4 @@
-export type ItemStatus = 'pending' | 'active' | 'sold' | 'expired' | 'rejected';
+export type ItemStatus = 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'rejected';
 export type Role = 'USER' | 'ADMIN';
 
 export interface User {

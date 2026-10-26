@@ -68,3 +68,19 @@ test('regular users cannot open the admin console', async ({ page }) => {
   await page.goto('/admin');
   await expect(page.getByText("You don't have access to this page")).toBeVisible();
 });
+
+test('a seller can save a draft, find it under Drafts and discard it', async ({ page }) => {
+  const title = `E2E draft lot ${Date.now()}`;
+  await logIn(page, 'maya@bidnest.test');
+  await page.goto('/sell/new');
+  await page.getByPlaceholder(/Maker, model, year/).fill(title);
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await page.waitForURL(/\/sell\?status=draft/);
+  await expect(page.getByText(title).first()).toBeVisible();
+  await expect(page.getByText('Not submitted').first()).toBeVisible();
+
+  await page.getByRole('button', { name: /more|actions|menu/i }).first().click();
+  await page.getByRole('menuitem', { name: 'Discard draft' }).click();
+  await page.getByRole('button', { name: 'Delete listing' }).click();
+  await expect(page.getByText(title)).toHaveCount(0);
+});
