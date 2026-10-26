@@ -1,5 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma';
+import { UPLOAD_DIR } from '../src/lib/upload';
 import { closeAuction } from '../src/modules/auctions/auction.service';
 import { address, app, checkout, createItem, createUser, loginAs, resetDb } from './helpers';
 import request from 'supertest';
@@ -139,5 +142,44 @@ describe('support conversations', () => {
     expect(await prisma.notification.count({ where: { userId: alice.id, title: 'We replied to your message' } })).toBe(1);
 
     await (await loginAs(bob.email)).post(`/api/me/messages/${id}/replies`).send({ body: 'Not my thread' }).expect(404);
+  });
+});
+
+describe('profile photo', () => {
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const created = new Set<string>();
+  const remember = (url: string | null) => url && created.add(path.basename(url));
+  const fileExists = (url: string) => fs.existsSync(path.join(UPLOAD_DIR, path.basename(url)));
+
+  afterAll(() => {
+    for (const file of created) fs.rmSync(path.join(UPLOAD_DIR, file), { force: true });
+  });
+
+  it('uploads a photo, replaces the old file, shows it on the profile and the lot seller card, and removes it', async () => {
+    const seller = await createUser();
+    const agent = await loginAs(seller.email);
+    const first = (await agent.post('/api/auth/me/avatar').attach('avatar', PNG, { filename: 'me.png', contentType: 'image/png' }).expect(200)).body.data.avatarUrl as string;
+    remember(first);
+    expect(first).toMatch(/\/uploads\/.+\.png$/);
+    expect((await agent.get('/api/auth/me').expect(200)).body.data.avatarUrl).toBe(first);
+
+    const second = (await agent.post('/api/auth/me/avatar').attach('avatar', PNG, { filename: 'again.png', contentType: 'image/png' }).expect(200)).body.data.avatarUrl as string;
+    remember(second);
+    expect(second).not.toBe(first);
+    expect(fileExists(first)).toBe(false);
+    expect(fileExists(second)).toBe(true);
+
+    const item = await createItem({ sellerId: seller.id });
+    expect((await request(app).get(`/api/items/${item.id}`).expect(200)).body.data.seller.avatarUrl).toBe(second);
+
+    expect((await agent.delete('/api/auth/me/avatar').expect(200)).body.data.avatarUrl).toBeNull();
+    expect(fileExists(second)).toBe(false);
+  });
+
+  it('requires a sign-in, a file and an image', async () => {
+    await request(app).post('/api/auth/me/avatar').attach('avatar', PNG, { filename: 'me.png', contentType: 'image/png' }).expect(401);
+    const agent = await loginAs((await createUser()).email);
+    await agent.post('/api/auth/me/avatar').expect(400);
+    await agent.post('/api/auth/me/avatar').attach('avatar', Buffer.from('not an image'), { filename: 'notes.txt', contentType: 'text/plain' }).expect(400);
   });
 });

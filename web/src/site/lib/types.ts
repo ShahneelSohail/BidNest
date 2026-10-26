@@ -7,6 +7,7 @@ export interface User {
   email: string;
   fullName: string;
   role: Role;
+  avatarUrl: string | null;
   location: string | null;
   bio: string | null;
   isPublic: boolean;
@@ -55,6 +56,7 @@ export interface ItemDetail extends ListItem {
   nextMinimumBid: number;
   images: { id: number; url: string; isPrimary: boolean }[];
   documents: { id: number; fileName: string; url: string }[];
+  seller: { id: number; username: string; avatarUrl: string | null; createdAt?: string };
   viewCount: number;
   winnerId: number | null;
   paid: boolean;

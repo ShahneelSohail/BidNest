@@ -14,7 +14,7 @@ import { AuctionGallery } from './auction-gallery';
 import { AuctionLedger } from './auction-ledger';
 import { ItemCard, lotNumber } from './ItemCard';
 import { useAuth, useToast } from './Providers';
-import { cx, EmptyState, LinkButton, Skeleton, StatusBadge } from './ui';
+import { Avatar, cx, EmptyState, LinkButton, Skeleton, StatusBadge } from './ui';
 
 const MAX_VISIBLE_BIDS = 10;
 const SIMILAR_COUNT = 4;
@@ -102,11 +102,9 @@ const Sparkline = ({ amounts }: { amounts: number[] }) => {
   );
 };
 
-const initialsOf = (name: string) => name.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
-
 const SellerCard = ({ item }: { item: ItemDetail }) => (
   <div className="flex items-center gap-3.5 border-y border-line py-4">
-    <span className="display grid size-11 shrink-0 place-items-center rounded-full border border-line-strong bg-surface-3 text-[17px] text-gold-300">{initialsOf(item.seller.username)}</span>
+    <Avatar name={item.seller.username} src={item.seller.avatarUrl} className="display size-11 border border-line-strong bg-surface-3 text-[17px] text-gold-300" />
     <div className="min-w-0 flex-1">
       <p className="truncate text-[15px] font-semibold">{item.seller.username}</p>
       <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[13px] text-muted">

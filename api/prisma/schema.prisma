@@ -36,6 +36,7 @@ model User {
   fullName        String
   role            Role             @default(USER)
   isBlocked       Boolean          @default(false)
+  avatarUrl       String?
   location        String?
   bio             String?
   isPublic        Boolean          @default(true)

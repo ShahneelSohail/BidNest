@@ -17,7 +17,7 @@ export const detailInclude = {
   category: { select: { id: true, name: true } },
   images: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
   documents: true,
-  seller: { select: { id: true, username: true, createdAt: true } },
+  seller: { select: { id: true, username: true, avatarUrl: true, createdAt: true } },
   currentBid: { select: { id: true, bidderId: true, amount: true } },
   _count: { select: { bids: true, watchers: true } },
 } satisfies Prisma.ItemInclude;
@@ -60,7 +60,7 @@ export const toDetailItem = (item: DetailItem) => ({
   nextMinimumBid: nextMinimumBid(item),
   images: item.images.map(image => ({ id: image.id, url: imageUrl(image.url), isPrimary: image.isPrimary })),
   documents: item.documents.map(doc => ({ id: doc.id, fileName: doc.fileName, url: imageUrl(doc.url) })),
-  seller: item.seller,
+  seller: { ...item.seller, avatarUrl: item.seller.avatarUrl && imageUrl(item.seller.avatarUrl) },
   viewCount: item.viewCount,
   winnerId: item.status === 'SOLD' ? (item.currentBid?.bidderId ?? null) : null,
   paid: item.paidAt !== null,

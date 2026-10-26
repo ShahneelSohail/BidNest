@@ -77,6 +77,14 @@ export const StatusBadge = ({ status, label }: { status: ItemStatus; label?: str
   </span>
 );
 
+const initialsOf = (name: string): string => name.replace(/[^a-z ]/gi, '').split(' ').filter(Boolean).map(word => word[0]).join('').slice(0, 2).toUpperCase();
+
+export const Avatar = ({ name, src, className }: { name: string; src?: string | null; className?: string }) => (
+  <span className={cx('grid shrink-0 place-items-center overflow-hidden rounded-full', className)}>
+    {src ? <img src={src} alt="" className="size-full object-cover" /> : initialsOf(name)}
+  </span>
+);
+
 export const Spinner = () => <div className="mx-auto my-16 size-8 animate-spin rounded-full border border-line-strong border-t-gold-300" role="progressbar" aria-label="Loading" />;
 
 export const Skeleton = ({ className }: { className?: string }) => <div aria-hidden className={cx('skeleton', className)} />;

@@ -7,14 +7,12 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
 import type { PageMeta } from '../lib/api';
 import { useAuth } from './Providers';
-import { cx, LinkButton } from './ui';
+import { Avatar, cx, LinkButton } from './ui';
 
 const unreadCount = async () => {
   const { meta } = await api.page<unknown>('/me/notifications?pageSize=1');
   return (meta as PageMeta & { unread: number }).unread;
 };
-
-const initials = (name: string) => name.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
 
 const UserMenu = ({ onSignOut }: { onSignOut: () => void }) => {
   const { user } = useAuth();
@@ -40,7 +38,7 @@ const UserMenu = ({ onSignOut }: { onSignOut: () => void }) => {
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(value => !value)} aria-haspopup="menu" aria-expanded={open} className="flex items-center gap-2.5 rounded-full border border-line-strong py-1 pr-4 pl-1 text-[13px] transition hover:border-gold-300">
-        <span className="grid size-8 place-items-center rounded-full bg-gold-300 text-[11px] font-bold text-ink">{initials(user.username)}</span>
+        <Avatar name={user.username} src={user.avatarUrl} className="size-8 bg-gold-300 text-[11px] font-bold text-ink" />
         {user.username}
       </button>
       {open && (

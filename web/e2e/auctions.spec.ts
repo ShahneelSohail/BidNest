@@ -124,3 +124,14 @@ test('a maximum bid defends the lead against a rival bid', async ({ browser }) =
   await expect(bidder.getByText(/You're the highest bidder/).first()).toBeVisible();
   await expect(bidder.getByText(`maximum $${(minimum + 500).toLocaleString('en-US')}.00`).first()).toBeVisible();
 });
+
+test('a member can upload a profile photo and remove it again', async ({ page }) => {
+  await logIn(page, 'ivy@bidnest.test');
+  await page.goto('/settings/profile');
+  await page.getByLabel('Upload photo').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: PNG });
+  await expect(page.getByText('Photo updated.')).toBeVisible();
+  await expect(page.locator('main img').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Remove' }).click();
+  await expect(page.getByText('Photo removed.')).toBeVisible();
+  await expect(page.getByLabel('Upload photo')).toBeAttached();
+});

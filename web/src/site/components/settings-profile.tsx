@@ -7,7 +7,7 @@ import { formatFullDate } from '../lib/time';
 import type { User } from '../lib/types';
 import { useAuth, useToast } from './Providers';
 import { SaveBar, SettingsHeading, Switch } from './settings-controls';
-import { Field, Input, Spinner, Textarea } from './ui';
+import { Avatar, Button, cx, Field, Input, Spinner, Textarea } from './ui';
 
 interface ProfileValues {
   fullName: string;
@@ -18,6 +18,7 @@ interface ProfileValues {
 }
 
 const BIO_MAX = 300;
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const toValues = (user: User): ProfileValues => ({ fullName: user.fullName, email: user.email, location: user.location ?? '', bio: user.bio ?? '', isPublic: user.isPublic });
@@ -32,14 +33,6 @@ const textFields = [
   { key: 'email', label: 'Email', placeholder: 'you@example.com', type: 'email', autoComplete: 'email', hint: 'Private. Used for alerts and receipts' },
   { key: 'location', label: 'Location', placeholder: 'City, country', type: 'text', autoComplete: 'address-level2', hint: 'Used for shipping estimates' },
 ] as const;
-
-const initials = (name: string) =>
-  name
-    .split(' ')
-    .map(word => word[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
 
 const ProfileForm = ({ user }: { user: User }) => {
   const toast = useToast();
@@ -59,17 +52,50 @@ const ProfileForm = ({ user }: { user: User }) => {
     onError: error => toast('error', error.message),
   });
 
+  const savePhoto = (updated: User, message: string) => {
+    queryClient.setQueryData(['me'], updated);
+    toast('success', message);
+  };
+  const photo = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('avatar', file);
+      return api.post<User>('/auth/me/avatar', form);
+    },
+    onSuccess: updated => savePhoto(updated, 'Photo updated.'),
+    onError: error => toast('error', error.message),
+  });
+  const removePhoto = useMutation({
+    mutationFn: () => api.delete<User>('/auth/me/avatar'),
+    onSuccess: updated => savePhoto(updated, 'Photo removed.'),
+    onError: error => toast('error', error.message),
+  });
+  const chooseFile = (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > MAX_PHOTO_BYTES) return toast('error', 'Choose an image under 5 MB.');
+    photo.mutate(file);
+  };
+
   return (
     <div className="flex flex-col gap-12">
       <SettingsHeading eyebrow="Profile" title="How the room sees you." text="Your name and username appear on bid ledgers. Your email stays private." />
       <div className="flex flex-wrap items-center gap-7 border-b border-line pb-10">
-        <span className="grid size-28 flex-none place-items-center rounded-full border border-gold-300/40 bg-surface-3 shadow-[0_0_0_6px_rgb(231_211_147/0.06)]">
-          <span className="display text-[40px] text-gold-300">{initials(values.fullName || '?')}</span>
-        </span>
+        <Avatar name={values.fullName || '?'} src={user.avatarUrl} className="display size-28 flex-none border border-gold-300/40 bg-surface-3 text-[40px] text-gold-300 shadow-[0_0_0_6px_rgb(231_211_147/0.06)]" />
         <div className="flex flex-col gap-2.5">
           <p className="display text-[28px]">{values.fullName || 'Your name'}</p>
           <p className="text-[13px] text-muted">@{user.username} · member since {formatFullDate(user.createdAt)}</p>
-          <p className="text-xs text-muted">Photo upload is not available yet, so your initials are used.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className={cx('inline-flex h-9 cursor-pointer items-center rounded-full border border-line-strong px-4 text-[13px] font-semibold text-gold-300 transition hover:bg-gold-300 hover:text-ink', photo.isPending && 'pointer-events-none opacity-50')}>
+              {photo.isPending ? 'Uploading…' : user.avatarUrl ? 'Change photo' : 'Upload photo'}
+              <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="sr-only" aria-label="Upload photo" onChange={event => chooseFile(event.target.files?.[0])} />
+            </label>
+            {user.avatarUrl && (
+              <Button variant="ghost" size="sm" disabled={photo.isPending} onClick={() => removePhoto.mutate()}>
+                Remove
+              </Button>
+            )}
+            <span className="text-xs text-muted">JPG, PNG, GIF or WebP, up to 5 MB</span>
+          </div>
         </div>
       </div>
       <div className="grid gap-x-10 gap-y-9 sm:grid-cols-2">

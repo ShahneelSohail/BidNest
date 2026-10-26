@@ -3,17 +3,21 @@ import { Router, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { env } from '../../config/env';
 import { asyncHandler, badRequest, conflict, forbidden } from '../../lib/http';
+import { imageUpload, removeUploads, uploadedPath } from '../../lib/upload';
 import { prisma } from '../../lib/prisma';
 import { AUTH_COOKIE, SOCKET_TOKEN_TTL, cookieOptions, signToken } from '../../lib/tokens';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
+import { imageUrl } from '../items/item.dto';
 import { changePasswordSchema, loginSchema, profileSchema, registerSchema } from './auth.schemas';
 
 const BCRYPT_ROUNDS = 10;
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_ATTEMPTS = 30;
 
-const publicUser = { id: true, username: true, email: true, fullName: true, role: true, location: true, bio: true, isPublic: true, createdAt: true } as const;
+const publicUser = { id: true, username: true, email: true, fullName: true, role: true, avatarUrl: true, location: true, bio: true, isPublic: true, createdAt: true } as const;
+
+const toPublicUser = <T extends { avatarUrl: string | null }>(user: T) => ({ ...user, avatarUrl: user.avatarUrl && imageUrl(user.avatarUrl) });
 
 const authLimiter = rateLimit({
   windowMs: AUTH_WINDOW_MS,
@@ -46,7 +50,7 @@ authRouter.post(
       select: publicUser,
     });
     startSession(res, user.id);
-    res.status(201).json({ data: user });
+    res.status(201).json({ data: toPublicUser(user) });
   })
 );
 
@@ -62,7 +66,7 @@ authRouter.post(
     if (user.isBlocked) throw forbidden('Your account has been blocked. Please contact support.');
 
     startSession(res, user.id);
-    res.json({ data: { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, location: user.location, bio: user.bio, isPublic: user.isPublic, createdAt: user.createdAt } });
+    res.json({ data: toPublicUser({ id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, avatarUrl: user.avatarUrl, location: user.location, bio: user.bio, isPublic: user.isPublic, createdAt: user.createdAt }) });
   })
 );
 
@@ -88,7 +92,7 @@ authRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: currentUser(req).id }, select: publicUser });
-    res.json({ data: user });
+    res.json({ data: toPublicUser(user) });
   })
 );
 
@@ -107,7 +111,34 @@ authRouter.patch(
     if (taken) throw conflict('That email is already registered.');
 
     const user = await prisma.user.update({ where: { id }, data: { fullName, email, location, bio, isPublic }, select: publicUser });
-    res.json({ data: user });
+    res.json({ data: toPublicUser(user) });
+  })
+);
+
+authRouter.post(
+  '/me/avatar',
+  requireAuth,
+  imageUpload.single('avatar'),
+  asyncHandler(async (req, res) => {
+    const file = req.file;
+    if (!file) throw badRequest('Choose an image to upload.');
+    const { id } = currentUser(req);
+    const previous = await prisma.user.findUniqueOrThrow({ where: { id }, select: { avatarUrl: true } });
+    const user = await prisma.user.update({ where: { id }, data: { avatarUrl: uploadedPath(file) }, select: publicUser });
+    if (previous.avatarUrl) await removeUploads([previous.avatarUrl]);
+    res.json({ data: toPublicUser(user) });
+  })
+);
+
+authRouter.delete(
+  '/me/avatar',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { id } = currentUser(req);
+    const previous = await prisma.user.findUniqueOrThrow({ where: { id }, select: { avatarUrl: true } });
+    const user = await prisma.user.update({ where: { id }, data: { avatarUrl: null }, select: publicUser });
+    if (previous.avatarUrl) await removeUploads([previous.avatarUrl]);
+    res.json({ data: toPublicUser(user) });
   })
 );
 
