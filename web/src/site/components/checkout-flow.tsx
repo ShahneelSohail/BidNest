@@ -98,10 +98,12 @@ const ShippingStep = ({ addresses, addressId, onAddress, options, deliveryKey, o
             );
           })}
         </div>
-        <button onClick={() => setAdding(value => !value)} className="inline-flex min-h-11 items-center gap-2 self-start text-sm font-medium text-gold-300">
-          <Icon name="plus" size={15} />
-          {adding ? 'Cancel' : 'Add a new address'}
-        </button>
+        {addresses.length > 0 && (
+          <button onClick={() => setAdding(value => !value)} className="inline-flex min-h-11 items-center gap-2 self-start text-sm font-medium text-gold-300">
+            <Icon name="plus" size={15} />
+            {adding ? 'Cancel' : 'Add a new address'}
+          </button>
+        )}
         {adding && (
           <NewAddressForm
             onSaved={address => {

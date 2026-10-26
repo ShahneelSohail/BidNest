@@ -75,6 +75,28 @@ const ITEMS: SeedItem[] = [
   { slug: 'mystery-box', title: 'Mystery Box of Misc Items', description: 'Assorted stuff.', category: 'Collectibles', seller: 'kai', glyph: 'box', minBid: 25, increment: 2, status: 'REJECTED', endsInHours: 96, bids: 0, rejectionReason: 'The description is too vague. Please list each item and add clear photos.' },
 ];
 
+const SHIPPING_COST = 85;
+
+const createPaidOrder = async (itemId: number, winningBidId: number, price: number, paidAt: Date) => {
+  const { bidderId } = await prisma.bid.findUniqueOrThrow({ where: { id: winningBidId } });
+  const buyer = await prisma.user.findUniqueOrThrow({ where: { id: bidderId } });
+  const address = await prisma.address.create({ data: { userId: bidderId, label: 'Home', name: buyer.fullName, line1: '221 Kent Avenue', line2: 'Apt 4', city: 'Brooklyn', region: 'NY', postal: '11249', country: 'USA' } });
+  await prisma.order.create({
+    data: {
+      itemId,
+      buyerId: bidderId,
+      receiptNo: `BN-${String(itemId).padStart(6, '0')}`,
+      shippingTo: { label: address.label, name: address.name, line1: address.line1, line2: address.line2, city: address.city, region: address.region, postal: address.postal, country: address.country },
+      deliveryMethod: 'Insured courier',
+      itemPrice: price,
+      shippingCost: SHIPPING_COST,
+      total: price + SHIPPING_COST,
+      paymentLabel: 'Visa ending 4242',
+      paidAt,
+    },
+  });
+};
+
 const pick = <T>(list: T[], index: number): T => list[index % list.length]!;
 
 const resetDatabase = async () => {
@@ -145,7 +167,9 @@ const main = async () => {
       lastBidId = bid.id;
     }
     if (lastBidId) {
-      await prisma.item.update({ where: { id: item.id }, data: { currentPrice: amount, currentBidId: lastBidId, paidAt: seed.paid ? new Date(now - 2 * DAY) : null } });
+      const paidAt = seed.paid ? new Date(now - 2 * DAY) : null;
+      await prisma.item.update({ where: { id: item.id }, data: { currentPrice: amount, currentBidId: lastBidId, paidAt } });
+      if (paidAt) await createPaidOrder(item.id, lastBidId, amount, paidAt);
     }
   }
 
