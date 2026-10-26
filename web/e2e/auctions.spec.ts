@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { logIn, PNG } from './helpers';
+import { apiLogin, createLiveItem, logIn, PNG } from './helpers';
 
 const lotLinks = 'a[href^="/auctions/"]';
 
@@ -44,9 +44,7 @@ test('signed-out visitors are sent to login for protected pages', async ({ page 
 
 test('a listing created by a seller is approved by an admin and goes live', async ({ browser }) => {
   const title = `E2E vintage camera ${Date.now()}`;
-  const sellerContext = await browser.newContext();
-  const loginResponse = await sellerContext.request.post('/api/auth/login', { data: { email: 'omar@bidnest.test', password: process.env.SEED_PASSWORD ?? 'BidNest123!' } });
-  expect(loginResponse.ok()).toBe(true);
+  const sellerContext = await apiLogin(browser, 'omar@bidnest.test');
   const created = await sellerContext.request.post('/api/seller/items', {
     multipart: { title, description: 'Created by the end-to-end test.', minBid: '25', durationDays: '7', condition: 'Good', images: { name: 'camera.png', mimeType: 'image/png', buffer: PNG } },
   });
@@ -103,12 +101,11 @@ test('a buyer can follow up on a support thread and the admin sees it', async ({
 });
 
 test('a maximum bid defends the lead against a rival bid', async ({ browser }) => {
+  const itemId = await createLiveItem(browser, `E2E maximum bid lot ${Date.now()}`);
   const rival = await (await browser.newContext()).newPage();
   const bidder = await (await browser.newContext()).newPage();
   await logIn(bidder, 'noah@bidnest.test');
-  await bidder.goto('/auctions?q=Polaroid');
-  await bidder.locator(lotLinks).first().click();
-  await bidder.waitForURL(/\/auctions\/\d+$/, { waitUntil: 'commit' });
+  await bidder.goto(`/auctions/${itemId}`);
   await bidder.getByLabel('Bid automatically up to a maximum').check();
   const placeBid = bidder.getByRole('button', { name: /Place bid · \$/ }).first();
   const minimum = Number(((await placeBid.textContent()) ?? '').split('$')[1]!.replace(/,/g, ''));
@@ -118,7 +115,7 @@ test('a maximum bid defends the lead against a rival bid', async ({ browser }) =
   await expect(bidder.getByText('Bid placed').first()).toBeVisible();
 
   await logIn(rival, 'kai@bidnest.test');
-  await rival.goto(bidder.url());
+  await rival.goto(`/auctions/${itemId}`);
   await rival.getByRole('button', { name: /Place bid · \$/ }).first().click();
   await rival.getByRole('button', { name: 'Confirm bid' }).click();
   await expect(rival.getByText(/Outbid right away/)).toBeVisible();
