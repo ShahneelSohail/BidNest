@@ -70,11 +70,11 @@ const Thread = ({ message }: { message: AdminMessage }) => {
         <Bubble align="left" who={message.name} at={message.createdAt} tone="user">
           {message.message}
         </Bubble>
-        {message.adminReply && message.repliedAt && (
-          <Bubble align="right" who={message.repliedBy ?? 'You'} at={message.repliedAt} tone="admin">
-            {message.adminReply}
+        {message.replies.map(entry => (
+          <Bubble key={entry.id} align={entry.fromAdmin ? 'right' : 'left'} who={entry.fromAdmin ? (entry.author ?? 'You') : message.name} at={entry.createdAt} tone={entry.fromAdmin ? 'admin' : 'user'}>
+            {entry.body}
           </Bubble>
-        )}
+        ))}
       </div>
       <form onSubmit={send} className="flex flex-col gap-3 border-t border-line px-5 pt-3.5 pb-[18px]">
         <div className="flex gap-1.5 overflow-x-auto">
@@ -88,7 +88,7 @@ const Thread = ({ message }: { message: AdminMessage }) => {
           value={draft}
           onChange={event => setDraft(event.target.value)}
           onKeyDown={event => (event.metaKey || event.ctrlKey) && event.key === 'Enter' && send()}
-          placeholder={message.adminReply ? 'Send a follow-up reply' : `Reply to ${message.name}`}
+          placeholder={message.replies.length ? 'Send a follow-up reply' : `Reply to ${message.name}`}
           maxLength={2000}
           className="h-24 resize-none rounded-sm border border-line-strong bg-surface px-3.5 py-3 text-sm leading-relaxed text-text outline-none transition placeholder:text-muted focus:border-gold-300"
         />

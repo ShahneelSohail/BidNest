@@ -51,6 +51,7 @@ model User {
   ratingsReceived Rating[]         @relation("Rated")
   messages        ContactMessage[] @relation("MessageAuthor")
   repliedMessages ContactMessage[] @relation("MessageReplier")
+  messageReplies  MessageReply[]   @relation("ReplyAuthor")
 }
 
 model Category {
@@ -186,8 +187,22 @@ model ContactMessage {
   createdAt              DateTime      @default(now())
   user                   User?         @relation("MessageAuthor", fields: [userId], references: [id], onDelete: SetNull)
   repliedBy              User?         @relation("MessageReplier", fields: [repliedByUserId], references: [id])
+  replies                MessageReply[]
 
   @@index([status])
+}
+
+model MessageReply {
+  id        Int            @id @default(autoincrement())
+  messageId Int
+  authorId  Int?
+  fromAdmin Boolean
+  body      String
+  createdAt DateTime       @default(now())
+  message   ContactMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  author    User?          @relation("ReplyAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([messageId])
 }
 
 model Address {

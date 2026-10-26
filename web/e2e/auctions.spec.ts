@@ -84,3 +84,20 @@ test('a seller can save a draft, find it under Drafts and discard it', async ({ 
   await page.getByRole('button', { name: 'Delete listing' }).click();
   await expect(page.getByText(title)).toHaveCount(0);
 });
+
+test('a buyer can follow up on a support thread and the admin sees it', async ({ browser }) => {
+  const followUp = `Thanks, resubmitting now (${Date.now()})`;
+  const buyer = await (await browser.newContext()).newPage();
+  await logIn(buyer, 'kai@bidnest.test');
+  await buyer.goto('/dashboard/support');
+  await buyer.getByRole('button', { name: /Listing was rejected/ }).first().click();
+  await buyer.getByLabel('Reply').fill(followUp);
+  await buyer.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(buyer.getByText(followUp).first()).toBeVisible();
+
+  const admin = await (await browser.newContext()).newPage();
+  await logIn(admin, 'admin@bidnest.test');
+  await admin.goto('/admin/messages');
+  await admin.getByText('Listing was rejected').first().click();
+  await expect(admin.getByText(followUp).first()).toBeVisible();
+});

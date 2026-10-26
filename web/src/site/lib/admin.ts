@@ -62,6 +62,14 @@ export interface AdminBid extends Bid {
 
 export type MessageStatus = 'new' | 'read' | 'replied' | 'archived';
 
+export interface ThreadReply {
+  id: number;
+  fromAdmin: boolean;
+  author: string | null;
+  body: string;
+  createdAt: string;
+}
+
 export interface AdminMessage {
   id: number;
   userId: number | null;
@@ -74,6 +82,7 @@ export interface AdminMessage {
   repliedAt: string | null;
   repliedBy: string | null;
   createdAt: string;
+  replies: ThreadReply[];
 }
 
 export type MessagesMeta = PageMeta & { counts: Partial<Record<MessageStatus, number>> };

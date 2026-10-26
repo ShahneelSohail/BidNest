@@ -193,6 +193,9 @@ const main = async () => {
     ],
   });
 
+  const answered = await prisma.contactMessage.findFirstOrThrow({ where: { status: 'REPLIED' } });
+  await prisma.messageReply.create({ data: { messageId: answered.id, authorId: userId('admin'), fromAdmin: true, body: answered.adminReply!, createdAt: answered.repliedAt! } });
+
   const persianRug = itemIds.get('persian-rug');
   if (persianRug) {
     const winner = (await prisma.item.findUniqueOrThrow({ where: { id: persianRug }, include: { currentBid: true } })).currentBid;

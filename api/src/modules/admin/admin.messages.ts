@@ -5,6 +5,7 @@ import { pageMeta, pageQuery, paginate } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
 import { currentUser } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
+import { replyDto, replyInclude } from '../contact/message.thread';
 import { notify } from '../notifications/notification.service';
 
 const STATUSES = ['NEW', 'READ', 'REPLIED', 'ARCHIVED'] as const;
@@ -37,10 +38,11 @@ const dto = (message: Awaited<ReturnType<typeof findMessage>>) => ({
   repliedBy: message.repliedBy?.username ?? null,
   readAt: message.readAt,
   createdAt: message.createdAt,
+  replies: message.replies.map(replyDto),
 });
 
 const findMessage = async (id: number) => {
-  const message = await prisma.contactMessage.findUnique({ where: { id }, include: { repliedBy: { select: { username: true } } } });
+  const message = await prisma.contactMessage.findUnique({ where: { id }, include: { repliedBy: { select: { username: true } }, ...replyInclude } });
   if (!message) throw notFound('Message not found.');
   return message;
 };
@@ -54,7 +56,7 @@ messagesRouter.get(
     const query = req.query as unknown as z.infer<typeof messagesQuery>;
     const where = query.status === 'all' ? {} : { status: query.status };
     const [messages, total, counts] = await Promise.all([
-      prisma.contactMessage.findMany({ where, orderBy: { createdAt: 'desc' }, include: { repliedBy: { select: { username: true } } }, ...paginate(query) }),
+      prisma.contactMessage.findMany({ where, orderBy: { createdAt: 'desc' }, include: { repliedBy: { select: { username: true } }, ...replyInclude }, ...paginate(query) }),
       prisma.contactMessage.count({ where }),
       prisma.contactMessage.groupBy({ by: ['status'], _count: { _all: true } }),
     ]);
@@ -84,10 +86,14 @@ messagesRouter.post(
   asyncHandler(async (req, res) => {
     const { id } = req.params as unknown as Params;
     const message = await findMessage(id);
-    await prisma.contactMessage.update({
-      where: { id },
-      data: { adminReply: req.body.replyContent, status: 'REPLIED', repliedAt: new Date(), repliedByUserId: currentUser(req).id, readAt: message.readAt ?? new Date() },
-    });
+    const adminId = currentUser(req).id;
+    await prisma.$transaction([
+      prisma.messageReply.create({ data: { messageId: id, authorId: adminId, fromAdmin: true, body: req.body.replyContent } }),
+      prisma.contactMessage.update({
+        where: { id },
+        data: { adminReply: req.body.replyContent, status: 'REPLIED', repliedAt: new Date(), repliedByUserId: adminId, readAt: message.readAt ?? new Date() },
+      }),
+    ]);
     if (message.userId) {
       await notify({ userId: message.userId, title: 'We replied to your message', message: `Re: ${message.subject}`, link: '/dashboard/messages' });
     }

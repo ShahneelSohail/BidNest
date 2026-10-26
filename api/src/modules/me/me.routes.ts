@@ -7,6 +7,8 @@ import { money } from '../../lib/serialize';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { listInclude, toListItem } from '../items/item.dto';
+import { replyDto, replyInclude } from '../contact/message.thread';
+import { notifyMany } from '../notifications/notification.service';
 import { wonWhere } from './won';
 
 const RECENT_LIMIT = 5;
@@ -17,6 +19,7 @@ const ratingSchema = z.object({
   score: z.coerce.number().int().min(1, 'Choose a rating from 1 to 5').max(5, 'Choose a rating from 1 to 5'),
   comment: z.string().trim().max(1000).optional(),
 });
+const messageReplySchema = z.object({ body: z.string().trim().min(1, 'Reply cannot be empty').max(2000) });
 const notificationsQuery = pageQuery.extend({ unread: z.enum(['true', 'false']).default('false') });
 
 type BidsQuery = z.infer<typeof bidsQuery>;
@@ -186,7 +189,7 @@ meRouter.delete(
 meRouter.get(
   '/messages',
   asyncHandler(async (req, res) => {
-    const messages = await prisma.contactMessage.findMany({ where: { userId: currentUser(req).id }, orderBy: { createdAt: 'desc' } });
+    const messages = await prisma.contactMessage.findMany({ where: { userId: currentUser(req).id }, orderBy: { createdAt: 'desc' }, include: replyInclude });
     res.json({
       data: messages.map(message => ({
         id: message.id,
@@ -196,7 +199,28 @@ meRouter.get(
         adminReply: message.adminReply,
         repliedAt: message.repliedAt,
         createdAt: message.createdAt,
+        replies: message.replies.map(replyDto),
       })),
     });
+  })
+);
+
+meRouter.post(
+  '/messages/:id/replies',
+  validate('params', idParams),
+  validate('body', messageReplySchema),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as unknown as Params;
+    const user = currentUser(req);
+    const message = await prisma.contactMessage.findFirst({ where: { id, userId: user.id } });
+    if (!message) throw notFound('Message not found.');
+
+    const [reply] = await prisma.$transaction([
+      prisma.messageReply.create({ data: { messageId: id, authorId: user.id, fromAdmin: false, body: req.body.body }, include: replyInclude.replies.include }),
+      prisma.contactMessage.update({ where: { id }, data: { status: 'NEW', readAt: null } }),
+    ]);
+    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+    await notifyMany(admins.map(admin => ({ userId: admin.id, title: 'New reply on a support message', message: `${user.fullName} replied to "${message.subject}".`, link: '/admin/messages' })));
+    res.status(201).json({ data: replyDto(reply) });
   })
 );

@@ -115,3 +115,29 @@ describe('browse filters and listing details', () => {
     await agent.get('/api/seller/analytics?days=7').expect(400);
   });
 });
+
+describe('support conversations', () => {
+  it('builds a thread of staff replies and buyer follow-ups, and notifies the other side', async () => {
+    const [alice, bob, admin] = await Promise.all([createUser(), createUser(), createUser({ role: 'ADMIN' })]);
+    const aliceAgent = await loginAs(alice.email);
+    const adminAgent = await loginAs(admin.email);
+    await aliceAgent.post('/api/contact').send({ subject: 'Shipping question', message: 'How long does shipping usually take?' }).expect(201);
+    const id = (await prisma.contactMessage.findFirstOrThrow({ where: { userId: alice.id } })).id;
+
+    await adminAgent.post(`/api/admin/messages/${id}/reply`).send({ replyContent: 'Usually 3 to 5 business days.' }).expect(200);
+    await aliceAgent.post(`/api/me/messages/${id}/replies`).send({ body: '' }).expect(400);
+    const followUp = await aliceAgent.post(`/api/me/messages/${id}/replies`).send({ body: 'Does that include weekends?' }).expect(201);
+    expect(followUp.body.data).toMatchObject({ fromAdmin: false, body: 'Does that include weekends?' });
+    expect(await prisma.notification.count({ where: { userId: admin.id, title: 'New reply on a support message' } })).toBe(1);
+
+    const mine = (await aliceAgent.get('/api/me/messages').expect(200)).body.data[0] as { status: string; replies: { fromAdmin: boolean; body: string }[] };
+    expect(mine.status).toBe('new');
+    expect(mine.replies.map(reply => [reply.fromAdmin, reply.body])).toEqual([[true, 'Usually 3 to 5 business days.'], [false, 'Does that include weekends?']]);
+
+    const adminView = (await adminAgent.get(`/api/admin/messages/${id}`).expect(200)).body.data as { replies: unknown[] };
+    expect(adminView.replies).toHaveLength(2);
+    expect(await prisma.notification.count({ where: { userId: alice.id, title: 'We replied to your message' } })).toBe(1);
+
+    await (await loginAs(bob.email)).post(`/api/me/messages/${id}/replies`).send({ body: 'Not my thread' }).expect(404);
+  });
+});
