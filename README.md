@@ -14,11 +14,14 @@ An online auction platform where sellers list items, buyers bid in real time, an
 
 **Highlights**
 
-- Bidding runs inside a transaction that locks the item row, so two simultaneous bids can never both win. Every accepted bid is pushed instantly to everyone watching that auction, and outbid, won and approval notifications reach the right user in real time.
-- A background timer closes finished auctions, picks the winner and sends "ending soon" reminders at 30, 15, 5 and 1 minutes.
-- Listings go through admin approval. Admins manage users, categories, listings, bids and contact messages.
-- Buyers get a dashboard (bids, won items with payment and seller rating, watchlist, notifications). Sellers get listing management and earnings stats.
-- The landing page keeps the original look. Its 3D scenes load only when scrolled near, pause when off screen, and use compressed models (about 42 MB of models became about 1.5 MB).
+- **Live bidding.** Bids run inside a transaction that locks the item row, so two simultaneous bids can never both win. Every accepted bid is pushed instantly to everyone watching the auction, and outbid, won and approval notifications reach the right person in real time.
+- **Automatic bidding.** Bidders can set a maximum. The system bids for them one increment at a time, only as far as needed; the higher maximum wins at one increment above the lower one, and the earlier maximum wins a tie.
+- **Auction timer.** A background job closes finished auctions, picks the winner and sends "ending soon" reminders at 30, 15, 5 and 1 minutes.
+- **Selling.** Sellers save drafts, edit them, then submit for approval. They get earnings charts, view counts and listing management. Admins approve or reject (with a one-minute undo), manage users, listings, categories (with ordering), bids and support threads.
+- **Buying.** Buyers get a dashboard (bids, won items, watchlist, notifications), saved addresses, delivery options, a checkout with receipts, seller ratings, and a two-way support conversation.
+- **Accounts.** Profile photos, public profile settings and per-channel notification preferences.
+- **Payments.** With a Stripe test key the checkout uses Stripe's hosted page and records the order exactly once, from the return or the signed webhook. Without a key it falls back to a demo card form that only stores the brand and last four digits.
+- **Landing page.** It keeps the original look. The 3D scenes load only when scrolled near and pause off screen, the models are compressed, and the hero video is 1080p, so the first load is about 5 MB instead of about 18 MB.
 
 ### Running it
 
@@ -40,9 +43,29 @@ npm install
 npm run dev                 # web app on http://localhost:3000
 ```
 
-The seed creates demo data and accounts such as `admin@bidnest.test` and `maya@bidnest.test`; the shared demo password is in [`api/prisma/seed.ts`](api/prisma/seed.ts). It is for local development only.
+The seed creates demo data and accounts such as `admin@bidnest.test` and `maya@bidnest.test`; the shared demo password is in [`api/prisma/seed.ts`](api/prisma/seed.ts). It is for local development only. While the API runs with `NODE_ENV=development`, the login page also shows quick-login buttons for the demo accounts; the endpoint behind them does not exist in production.
 
-Tests: `npm test` in `api/`, and `npm run test:e2e` in `web/` (with the API and web app running).
+### Card payments with Stripe (optional)
+
+1. Put your test secret key in `api/.env` as `STRIPE_SECRET_KEY` (it starts with `sk_test_`).
+2. Forward webhooks to the API with the Stripe CLI and put the signing secret it prints in `STRIPE_WEBHOOK_SECRET`:
+
+   ```bash
+   stripe listen --forward-to localhost:4000/api/webhooks/stripe
+   ```
+
+3. Restart the API. The checkout now sends the buyer to Stripe; use the test card `4242 4242 4242 4242`. The buyer's return to the site also confirms the payment, so the webhook is a safety net rather than a requirement.
+
+Keys belong only in `api/.env`, which is ignored by git.
+
+### Tests
+
+| Command | What it covers |
+|---|---|
+| `npm test` in `api/` | The API against an embedded PostgreSQL: auth, bidding and automatic bidding, auctions and the timer, sockets, checkout and Stripe (with a stubbed client and signed test webhooks), drafts, support threads, avatars and the admin area |
+| `npm run test:e2e` in `web/` | Playwright through the real browser UI, with the API and web app running: browsing, live bid updates, approvals and undo, drafts, support, maximum bids, profile photos, checkout and a mobile layout check |
+
+The end-to-end tests sign in through the development-only quick login, so run them against a development API. If the browser Playwright expects is not installed, set `CHROMIUM_PATH` to an installed Chromium.
 
 ## The original application (in `legacy/`)
 

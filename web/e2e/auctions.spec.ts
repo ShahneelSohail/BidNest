@@ -3,30 +3,31 @@ import { apiLogin, createLiveItem, logIn, PNG } from './helpers';
 
 const lotLinks = 'a[href^="/auctions/"]';
 
-test('visitors can browse and filter live auctions', async ({ page }) => {
+test('visitors can browse and filter live auctions', async ({ browser, page }) => {
+  const token = `Zephyr${Date.now()}`;
+  await createLiveItem(browser, `${token} theremin`);
   await page.goto('/auctions');
   await expect(page.getByRole('heading', { name: /The room\s+is live/ })).toBeVisible();
 
-  await page.getByLabel('Search lots').fill('Stratocaster');
-  await page.waitForURL(/q=Stratocaster/);
+  await page.getByLabel('Search lots').fill(token);
+  await page.waitForURL(new RegExp(`q=${token}`));
   await expect(page.locator(lotLinks).first()).toBeVisible();
   await page.locator(lotLinks).first().click();
   await page.waitForURL(/\/auctions\/\d+$/);
-  await expect(page.getByRole('heading', { name: /Stratocaster/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: new RegExp(token) })).toBeVisible();
   await expect(page.getByRole('link', { name: /log in to bid/i }).first()).toBeVisible();
 });
 
 test('bids appear instantly for everyone watching the auction', async ({ browser }) => {
+  const itemId = await createLiveItem(browser, `Zephyr${Date.now()} synthesizer`);
   const bidder = await (await browser.newContext()).newPage();
   const watcher = await (await browser.newContext()).newPage();
   await logIn(bidder, 'maya@bidnest.test');
 
-  await watcher.goto('/auctions?q=Stratocaster');
-  await watcher.locator(lotLinks).first().click();
-  await watcher.waitForURL(/\/auctions\/\d+$/);
-  await expect(watcher.getByRole('heading', { name: /Stratocaster/ })).toBeVisible();
+  await watcher.goto(`/auctions/${itemId}`);
+  await expect(watcher.getByRole('heading', { name: /synthesizer/ })).toBeVisible();
 
-  await bidder.goto(watcher.url());
+  await bidder.goto(`/auctions/${itemId}`);
   const placeBid = bidder.getByRole('button', { name: /Place bid · \$/ }).first();
   const label = (await placeBid.textContent()) ?? '';
   const amount = label.split('·')[1]!.trim();
@@ -186,4 +187,44 @@ test('a winner pays for a lot through the demo checkout and gets a receipt', asy
   await expect(page.getByText('Payment received').first()).toBeVisible();
   await expect(page.getByText(/BN-\d{6}/).first()).toBeVisible();
   await expect(page.getByText('Visa ending 4242').first()).toBeVisible();
+});
+
+test('the landing page renders its hero and navigation without errors', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Login' }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Register' }).first()).toBeVisible();
+  await expect(page.locator('video').first()).toBeAttached();
+  expect(errors).toEqual([]);
+});
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  for (const path of ['/auctions', '/login', '/register']) {
+    test(`${path} has no sideways scrolling`, async ({ page }) => {
+      await page.goto(path);
+      await page.waitForLoadState('load');
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+    });
+  }
+
+  const signedInPages = [
+    { email: 'maya@bidnest.test', paths: ['/dashboard', '/dashboard/bids', '/sell', '/settings/profile'] },
+    { email: 'admin@bidnest.test', paths: ['/admin/approvals', '/admin/categories', '/admin/users'] },
+  ];
+  for (const { email, paths } of signedInPages) {
+    for (const path of paths) {
+      test(`${path} has no sideways scrolling for ${email.split('@')[0]}`, async ({ page }) => {
+        await logIn(page, email);
+        await page.goto(path);
+        await page.waitForLoadState('load');
+        await page.waitForTimeout(2500);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        expect(overflow).toBeLessThanOrEqual(1);
+      });
+    }
+  }
 });

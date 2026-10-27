@@ -95,7 +95,7 @@ const RecentSales = ({ sales }: { sales: SellerAnalytics['recentSales'] }) =>
   sales.length > 0 && (
     <section>
       <h2 className="display mb-4 text-4xl md:text-[44px]">Recent sales</h2>
-      <ul className="grid gap-x-14 md:grid-cols-2">
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-x-14 md:grid-cols-2">
         {sales.map(sale => (
           <li key={sale.id}>
             <Link href={`/auctions/${sale.id}`} className="flex items-center gap-4 border-b border-line py-3.5 transition hover:bg-gold-300/[0.03]">

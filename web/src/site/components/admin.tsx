@@ -108,7 +108,7 @@ export const AdminShell = ({ children }: { children: ReactNode }) => {
   const stats = useAdminOverview().data?.stats;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-0 lg:border lg:border-line">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-0 lg:border lg:border-line">
       <aside className="flex flex-col bg-surface lg:border-r lg:border-line lg:px-3.5 lg:py-7">
         <nav aria-label="Admin" className="flex gap-1 overflow-x-auto lg:flex-col lg:gap-0.5">
           {sections.map((section, sectionIndex) => (

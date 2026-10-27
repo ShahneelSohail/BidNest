@@ -55,7 +55,7 @@ const CategoryRow = ({ category, lots, depth, collapsed, selected, onToggleColla
   const nameClass = depth === 0 ? 'display text-2xl' : 'text-[15px]';
 
   return (
-    <div className={cx('flex items-center gap-2.5 px-2 transition hover:bg-gold-300/[0.03]', depth === 0 ? 'min-h-[60px]' : 'ml-[38px] min-h-12 border-l border-line pl-3')}>
+    <div className={cx('flex flex-wrap items-center gap-x-2.5 px-2 py-1 transition hover:bg-gold-300/[0.03]', depth === 0 ? 'min-h-[60px]' : 'ml-[38px] min-h-12 border-l border-line pl-3')}>
       {depth === 0 && (
         <button onClick={onToggleCollapse} aria-label={collapsed ? 'Expand' : 'Collapse'} disabled={category.childCount === 0} className="grid size-7 place-items-center text-text-2 disabled:opacity-0">
           <span className={cx('transition-transform duration-300 ease-(--ease-expo)', !collapsed && 'rotate-90')}>
@@ -83,7 +83,7 @@ const CategoryRow = ({ category, lots, depth, collapsed, selected, onToggleColla
         </span>
       )}
       <span className="tnum shrink-0 text-[13px] text-muted">{plural(lots, 'lot')}</span>
-      <span className="flex shrink-0 items-center gap-1">
+      <span className="ml-auto flex shrink-0 flex-wrap items-center gap-1">
         <Button size="sm" variant="ghost" disabled={!canMoveUp} onClick={() => onMove(-1)} aria-label={`Move ${category.name} up`}>
           <Icon name="up" size={14} />
         </Button>

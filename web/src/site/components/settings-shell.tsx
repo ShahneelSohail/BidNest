@@ -16,7 +16,7 @@ const unavailable = ['Saved addresses', 'Payment methods', 'Close account'];
 export const SettingsShell = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
   return (
-    <div className="grid gap-10 pb-24 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-24">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-10 pb-24 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-24">
       <nav aria-label="Settings" className="flex flex-col gap-2 self-start lg:sticky lg:top-24 lg:gap-0.5">
         <p className="display mb-2 text-4xl leading-none lg:mb-5 lg:text-[44px]">Settings</p>
         <div className="flex gap-2 overflow-x-auto lg:flex-col lg:gap-0.5">
