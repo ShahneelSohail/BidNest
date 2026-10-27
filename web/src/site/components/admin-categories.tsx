@@ -42,9 +42,12 @@ interface RowProps {
   onToggleCollapse?: () => void;
   onToggleSelect: () => void;
   onAddChild?: () => void;
+  onMove: (delta: -1 | 1) => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }
 
-const CategoryRow = ({ category, lots, depth, collapsed, selected, onToggleCollapse, onToggleSelect, onAddChild }: RowProps) => {
+const CategoryRow = ({ category, lots, depth, collapsed, selected, onToggleCollapse, onToggleSelect, onAddChild, onMove, canMoveUp, canMoveDown }: RowProps) => {
   const [editing, setEditing] = useState(false);
   const rename = useAdminMutation((name: string) => api.patch(`/admin/categories/${category.id}`, { name, parentId: category.parentId, isActive: category.isActive }), 'Category renamed.');
   const toggle = useAdminMutation(() => api.patch(`/admin/categories/${category.id}/toggle`), category.isActive ? 'Category hidden from buyers.' : 'Category visible to buyers.');
@@ -81,6 +84,12 @@ const CategoryRow = ({ category, lots, depth, collapsed, selected, onToggleColla
       )}
       <span className="tnum shrink-0 text-[13px] text-muted">{plural(lots, 'lot')}</span>
       <span className="flex shrink-0 items-center gap-1">
+        <Button size="sm" variant="ghost" disabled={!canMoveUp} onClick={() => onMove(-1)} aria-label={`Move ${category.name} up`}>
+          <Icon name="up" size={14} />
+        </Button>
+        <Button size="sm" variant="ghost" disabled={!canMoveDown} onClick={() => onMove(1)} aria-label={`Move ${category.name} down`}>
+          <Icon name="down" size={14} />
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => setEditing(true)} aria-label={`Rename ${category.name}`}>
           <Icon name="pencil" size={14} />
         </Button>
@@ -202,6 +211,16 @@ const Manager = ({ categories }: { categories: AdminCategory[] }) => {
   const kidsOf = (id: number) => categories.filter(category => category.parentId === id);
   const totalLots = categories.reduce((sum, category) => sum + category.itemCount, 0);
   const subcategories = categories.length - parents.length;
+  const reorder = useAdminMutation((ids: number[]) => api.patch('/admin/categories/reorder', { ids }), 'Order saved.');
+  const moverFor = (siblings: AdminCategory[], index: number) => ({
+    canMoveUp: index > 0,
+    canMoveDown: index < siblings.length - 1,
+    onMove: (delta: -1 | 1) => {
+      const ids = siblings.map(sibling => sibling.id);
+      [ids[index], ids[index + delta]] = [ids[index + delta]!, ids[index]!];
+      reorder.mutate(ids);
+    },
+  });
 
   return (
     <div className="grid items-start gap-12 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -218,7 +237,7 @@ const Manager = ({ categories }: { categories: AdminCategory[] }) => {
         />
         {creating && <CreateForm parents={parents} parentId={creating.parentId} onParentChange={parentId => setCreating({ parentId })} onDone={() => setCreating(null)} />}
         <div className="flex flex-col border-t border-line-strong">
-          {parents.map(parent => {
+          {parents.map((parent, parentIndex) => {
             const kids = kidsOf(parent.id);
             return (
               <div key={parent.id} className="flex flex-col border-b border-line pb-1">
@@ -231,8 +250,12 @@ const Manager = ({ categories }: { categories: AdminCategory[] }) => {
                   onToggleCollapse={() => setCollapsed(current => toggleIn(current, parent.id))}
                   onToggleSelect={() => setSelected(current => toggleIn(current, parent.id))}
                   onAddChild={() => setCreating({ parentId: parent.id })}
+                  {...moverFor(parents, parentIndex)}
                 />
-                {!collapsed.has(parent.id) && kids.map(kid => <CategoryRow key={kid.id} category={kid} depth={1} lots={kid.itemCount} selected={selected.has(kid.id)} onToggleSelect={() => setSelected(current => toggleIn(current, kid.id))} />)}
+                {!collapsed.has(parent.id) &&
+                  kids.map((kid, kidIndex) => (
+                    <CategoryRow key={kid.id} category={kid} depth={1} lots={kid.itemCount} selected={selected.has(kid.id)} onToggleSelect={() => setSelected(current => toggleIn(current, kid.id))} {...moverFor(kids, kidIndex)} />
+                  ))}
               </div>
             );
           })}

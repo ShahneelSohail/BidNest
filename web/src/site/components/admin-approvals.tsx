@@ -88,8 +88,9 @@ const Review = ({ item, position, total, onStep, onDecided }: { item: AdminItem;
   const duration = `${days} day${days === 1 ? '' : 's'}`;
   const rejectionReason = [reasons.join(', '), note.trim()].filter(Boolean).join('. ');
 
-  const approve = useAdminMutation(() => api.post(`/admin/approvals/${item.id}/approve`, {}), `${lot} approved. The seller has been notified.`);
-  const reject = useAdminMutation((reason: string) => api.post(`/admin/approvals/${item.id}/reject`, { rejectionReason: reason }), `${lot} sent back to the seller.`);
+  const undo = () => api.post(`/admin/approvals/${item.id}/undo`);
+  const approve = useAdminMutation(() => api.post(`/admin/approvals/${item.id}/approve`, {}), `${lot} approved. The seller has been notified.`, undo);
+  const reject = useAdminMutation((reason: string) => api.post(`/admin/approvals/${item.id}/reject`, { rejectionReason: reason }), `${lot} sent back to the seller.`, undo);
   const busy = approve.isPending || reject.isPending;
 
   const approveNow = () => !busy && approve.mutate(undefined, { onSuccess: onDecided });

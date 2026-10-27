@@ -135,3 +135,30 @@ test('a member can upload a profile photo and remove it again', async ({ page })
   await expect(page.getByText('Photo removed.')).toBeVisible();
   await expect(page.getByLabel('Upload photo')).toBeAttached();
 });
+
+test('an admin can undo an approval and reorder categories', async ({ browser }) => {
+  const title = `E2E review lot ${Date.now()}`;
+  const sellerContext = await apiLogin(browser, 'omar@bidnest.test');
+  const created = await sellerContext.request.post('/api/seller/items', {
+    multipart: { title, description: 'Created by the end-to-end test.', minBid: '25', durationDays: '7', condition: 'Good', images: { name: 'item.png', mimeType: 'image/png', buffer: PNG } },
+  });
+  expect(created.status()).toBe(201);
+
+  const admin = await (await browser.newContext()).newPage();
+  await logIn(admin, 'admin@bidnest.test');
+  await admin.goto('/admin/approvals');
+  await admin.getByText(title).first().click();
+  await admin.getByRole('button', { name: 'Approve' }).click();
+  await admin.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(admin.getByText('Decision undone.')).toBeVisible();
+  await admin.goto('/admin/approvals');
+  await expect(admin.getByText(title).first()).toBeVisible();
+
+  await admin.goto('/admin/categories');
+  const firstRoot = admin.getByRole('button', { name: /^Move .+ down$/ }).first();
+  const rootName = (await firstRoot.getAttribute('aria-label'))!.replace(/^Move (.+) down$/, '$1');
+  await firstRoot.click();
+  await expect(admin.getByText('Order saved.')).toBeVisible();
+  await admin.getByRole('button', { name: `Move ${rootName} up` }).click();
+  await expect(admin.getByText('Order saved.').first()).toBeVisible();
+});

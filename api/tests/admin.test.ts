@@ -288,3 +288,79 @@ describe('admin messages', () => {
     await admin.delete(`/api/admin/messages/${a.message.id}`).expect(404);
   });
 });
+
+describe('undoing an approval decision', () => {
+  const pendingItem = async () => {
+    const seller = await createUser();
+    const item = await prisma.item.create({
+      data: { sellerId: seller.id, title: 'Awaiting a decision', minBid: 40, currentPrice: 40, bidIncrement: 2, status: 'PENDING', startDate: new Date(), endDate: new Date(Date.now() + 5 * 86_400_000) },
+    });
+    return { seller, item };
+  };
+
+  it('puts an approved listing back in the queue and withdraws the seller notice', async () => {
+    const admin = await adminAgent();
+    const { seller, item } = await pendingItem();
+    await admin.post(`/api/admin/approvals/${item.id}/approve`).send({}).expect(200);
+    expect(await prisma.notification.count({ where: { userId: seller.id } })).toBe(1);
+
+    const undone = await admin.post(`/api/admin/approvals/${item.id}/undo`).expect(200);
+    expect(undone.body.data.status).toBe('pending');
+    expect(await prisma.notification.count({ where: { userId: seller.id } })).toBe(0);
+    expect(((await admin.get('/api/admin/approvals').expect(200)).body.data as unknown[]).length).toBe(1);
+    await admin.post(`/api/admin/approvals/${item.id}/undo`).expect(400);
+  });
+
+  it('undoes a rejection and clears the reason', async () => {
+    const admin = await adminAgent();
+    const { item } = await pendingItem();
+    await admin.post(`/api/admin/approvals/${item.id}/reject`).send({ rejectionReason: 'Photos too dark' }).expect(200);
+    const undone = await admin.post(`/api/admin/approvals/${item.id}/undo`).expect(200);
+    expect(undone.body.data).toMatchObject({ status: 'pending', rejectionReason: null });
+  });
+
+  it('refuses once the window has passed or the lot has bids, and for non-admins', async () => {
+    const admin = await adminAgent();
+    const { seller, item } = await pendingItem();
+    await admin.post(`/api/admin/approvals/${item.id}/approve`).send({}).expect(200);
+    await prisma.item.update({ where: { id: item.id }, data: { reviewedAt: new Date(Date.now() - 5 * 60_000) } });
+    await admin.post(`/api/admin/approvals/${item.id}/undo`).expect(400);
+
+    await prisma.item.update({ where: { id: item.id }, data: { reviewedAt: new Date() } });
+    const bidder = await createUser();
+    await prisma.bid.create({ data: { itemId: item.id, bidderId: bidder.id, amount: 42, isWinning: true } });
+    await admin.post(`/api/admin/approvals/${item.id}/undo`).expect(400);
+    await (await loginAs(seller.email)).post(`/api/admin/approvals/${item.id}/undo`).expect(403);
+  });
+});
+
+describe('category order', () => {
+  it('reorders siblings and serves the new order publicly and to admins', async () => {
+    const admin = await adminAgent();
+    const [first, second, third] = await Promise.all(['Alpha', 'Bravo', 'Charlie'].map(async name => (await admin.post('/api/admin/categories').send({ name }).expect(201)).body.data as { id: number }));
+
+    const names = async (path: string) => ((await request(app).get(path).expect(200)).body.data as { name: string }[]).map(category => category.name);
+    expect(await names('/api/categories')).toEqual(['Alpha', 'Bravo', 'Charlie']);
+
+    await admin.patch('/api/admin/categories/reorder').send({ ids: [third!.id, first!.id, second!.id] }).expect(200);
+    expect(await names('/api/categories')).toEqual(['Charlie', 'Alpha', 'Bravo']);
+    const adminOrder = ((await admin.get('/api/admin/categories').expect(200)).body.data as { name: string }[]).map(category => category.name);
+    expect(adminOrder).toEqual(['Charlie', 'Alpha', 'Bravo']);
+
+    const later = (await admin.post('/api/admin/categories').send({ name: 'Delta' }).expect(201)).body.data as { sortOrder: number };
+    expect(later.sortOrder).toBe(3);
+  });
+
+  it('rejects unknown, repeated or cross-group ids', async () => {
+    const admin = await adminAgent();
+    const parent = (await admin.post('/api/admin/categories').send({ name: 'Parent' }).expect(201)).body.data as { id: number };
+    const child = (await admin.post('/api/admin/categories').send({ name: 'Child', parentId: parent.id }).expect(201)).body.data as { id: number };
+    const other = (await admin.post('/api/admin/categories').send({ name: 'Other' }).expect(201)).body.data as { id: number };
+
+    await admin.patch('/api/admin/categories/reorder').send({ ids: [parent.id, 99999] }).expect(400);
+    await admin.patch('/api/admin/categories/reorder').send({ ids: [parent.id, parent.id] }).expect(400);
+    await admin.patch('/api/admin/categories/reorder').send({ ids: [child.id, other.id] }).expect(400);
+    await admin.patch('/api/admin/categories/reorder').send({ ids: [parent.id] }).expect(400);
+    await request(app).patch('/api/admin/categories/reorder').send({ ids: [parent.id, other.id] }).expect(401);
+  });
+});

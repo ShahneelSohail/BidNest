@@ -29,6 +29,8 @@ const ICONS = {
   close: 'M18 6 6 18M6 6l12 12',
   next: 'm9 18 6-6-6-6',
   prev: 'm15 18-6-6 6-6',
+  up: 'm18 15-6-6-6 6',
+  down: 'm6 9 6 6 6-6',
 } as const;
 
 export type IconName = keyof typeof ICONS;
@@ -44,14 +46,26 @@ const OVERVIEW_REFRESH_MS = 15_000;
 export const useAdminOverview = () =>
   useQuery({ queryKey: ['admin', 'overview'], queryFn: () => api.get<AdminOverviewData>('/admin/dashboard'), refetchInterval: OVERVIEW_REFRESH_MS });
 
-export const useAdminMutation = <V = void,>(mutationFn: (variables: V) => Promise<unknown>, success?: string | ((variables: V) => string)) => {
+export const useAdminMutation = <V = void,>(mutationFn: (variables: V) => Promise<unknown>, success?: string | ((variables: V) => string), undo?: (variables: V) => Promise<unknown>) => {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin'] });
   return useMutation({
     mutationFn,
     onSuccess: (_data, variables) => {
-      if (success) toast('success', typeof success === 'function' ? success(variables) : success);
-      return queryClient.invalidateQueries({ queryKey: ['admin'] });
+      const undoAction = undo && {
+        label: 'Undo',
+        onClick: () =>
+          void undo(variables).then(
+            () => {
+              toast('success', 'Decision undone.');
+              return refresh();
+            },
+            (error: Error) => toast('error', error.message)
+          ),
+      };
+      if (success) toast('success', typeof success === 'function' ? success(variables) : success, undoAction);
+      return refresh();
     },
     onError: error => toast('error', error.message),
   });

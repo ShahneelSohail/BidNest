@@ -11,6 +11,8 @@ import { detailInclude, listInclude, toDetailItem, toListItem } from '../items/i
 import { notify } from '../notifications/notification.service';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const UNDO_WINDOW_MS = 60 * 1000;
+const REVIEW_TITLES = ['Your listing was approved', 'Your listing was not approved'];
 const STATUSES = ['PENDING', 'ACTIVE', 'REJECTED', 'SOLD', 'EXPIRED'] as const;
 
 const idParams = z.object({ id: z.coerce.number().int().positive() });
@@ -218,7 +220,7 @@ itemsRouter.post(
 
     const approved = await prisma.item.update({
       where: { id },
-      data: { status: 'ACTIVE', startDate: new Date(now), endDate: new Date(now + duration), adminNotes: req.body.adminNotes || null, rejectionReason: null },
+      data: { status: 'ACTIVE', startDate: new Date(now), endDate: new Date(now + duration), adminNotes: req.body.adminNotes || null, rejectionReason: null, reviewedAt: new Date(now) },
       include: withSeller,
     });
     await notify({ userId: item.sellerId, title: 'Your listing was approved', message: `"${item.title}" is now live and open for bidding.`, link: `/auctions/${id}` });
@@ -237,11 +239,29 @@ itemsRouter.post(
 
     const rejected = await prisma.item.update({
       where: { id },
-      data: { status: 'REJECTED', rejectionReason, adminNotes: adminNotes || null },
+      data: { status: 'REJECTED', rejectionReason, adminNotes: adminNotes || null, reviewedAt: new Date() },
       include: withSeller,
     });
     await notify({ userId: item.sellerId, title: 'Your listing was not approved', message: `"${item.title}" was rejected: ${rejectionReason}`, link: '/sell' });
     res.json({ data: adminListItem(rejected) });
+  })
+);
+
+itemsRouter.post(
+  '/approvals/:id/undo',
+  validate('params', idParams),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as unknown as Params;
+    const item = await assertItem(id);
+    const withinWindow = item.reviewedAt !== null && Date.now() - item.reviewedAt.getTime() <= UNDO_WINDOW_MS;
+    if ((item.status !== 'ACTIVE' && item.status !== 'REJECTED') || !withinWindow) throw badRequest('This decision can no longer be undone.');
+    if ((await prisma.bid.count({ where: { itemId: id } })) > 0) throw badRequest('This listing already has bids, so the approval cannot be undone.');
+
+    const reopened = await prisma.$transaction(async tx => {
+      await tx.notification.deleteMany({ where: { userId: item.sellerId, title: { in: REVIEW_TITLES }, createdAt: { gte: item.reviewedAt! } } });
+      return tx.item.update({ where: { id }, data: { status: 'PENDING', reviewedAt: null, rejectionReason: null, adminNotes: null }, include: withSeller });
+    });
+    res.json({ data: adminListItem(reopened) });
   })
 );
 

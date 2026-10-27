@@ -19,6 +19,8 @@ const mergeSchema = z.object({
   deleteSource: z.boolean().default(true),
 });
 
+const reorderSchema = z.object({ ids: z.array(z.coerce.number().int().positive()).min(2).max(200) });
+
 const listQuery = z.object({
   q: z.string().trim().max(100).optional(),
   showInactive: z.enum(['true', 'false']).default('false'),
@@ -51,7 +53,7 @@ categoriesRouter.get(
     const { q, showInactive } = req.query as unknown as z.infer<typeof listQuery>;
     const categories = await prisma.category.findMany({
       where: { ...(showInactive === 'true' ? {} : { isActive: true }), ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}) },
-      orderBy: [{ parentId: 'asc' }, { name: 'asc' }],
+      orderBy: [{ parentId: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
       include: { parent: { select: { id: true, name: true } }, _count: { select: { items: true, children: true } } },
     });
     res.json({
@@ -65,8 +67,23 @@ categoriesRouter.post(
   validate('body', categorySchema),
   asyncHandler(async (req, res) => {
     await assertValidParent(null, req.body.parentId);
-    const category = await prisma.category.create({ data: req.body });
+    const last = await prisma.category.aggregate({ where: { parentId: req.body.parentId }, _max: { sortOrder: true } });
+    const category = await prisma.category.create({ data: { ...req.body, sortOrder: (last._max.sortOrder ?? -1) + 1 } });
     res.status(201).json({ data: category });
+  })
+);
+
+categoriesRouter.patch(
+  '/categories/reorder',
+  validate('body', reorderSchema),
+  asyncHandler(async (req, res) => {
+    const { ids } = req.body as z.infer<typeof reorderSchema>;
+    const categories = await prisma.category.findMany({ where: { id: { in: ids } }, select: { id: true, parentId: true } });
+    if (new Set(ids).size !== ids.length || categories.length !== ids.length) throw badRequest('Send each existing category once.');
+    if (new Set(categories.map(category => category.parentId)).size > 1) throw badRequest('Only categories in the same group can be reordered together.');
+
+    await prisma.$transaction(ids.map((id, index) => prisma.category.update({ where: { id }, data: { sortOrder: index } })));
+    res.json({ data: { ids } });
   })
 );
 

@@ -7,14 +7,21 @@ import { closeSocket } from '../lib/socket';
 import type { User } from '../lib/types';
 
 type ToastKind = 'success' | 'error';
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
+  action?: ToastAction;
 }
 
 const TOAST_MS = 4000;
-const ToastContext = createContext<(kind: ToastKind, message: string) => void>(() => undefined);
+const ACTION_TOAST_MS = 6000;
+const ToastContext = createContext<(kind: ToastKind, message: string, action?: ToastAction) => void>(() => undefined);
 export const useToast = () => useContext(ToastContext);
 
 interface Credentials {
@@ -83,11 +90,15 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 const ToastProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const push = useCallback((kind: ToastKind, message: string) => {
-    const id = Date.now() + Math.random();
-    setToasts(current => [...current, { id, kind, message }]);
-    setTimeout(() => setToasts(current => current.filter(toast => toast.id !== id)), TOAST_MS);
-  }, []);
+  const dismiss = useCallback((id: number) => setToasts(current => current.filter(toast => toast.id !== id)), []);
+  const push = useCallback(
+    (kind: ToastKind, message: string, action?: ToastAction) => {
+      const id = Date.now() + Math.random();
+      setToasts(current => [...current, { id, kind, message, action }]);
+      setTimeout(() => dismiss(id), action ? ACTION_TOAST_MS : TOAST_MS);
+    },
+    [dismiss]
+  );
 
   return (
     <ToastContext.Provider value={push}>
@@ -95,7 +106,20 @@ const ToastProvider = ({ children }: { children: ReactNode }) => {
       <div className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-80 flex-col gap-2" role="status" aria-live="polite">
         {toasts.map(toast => (
           <div key={toast.id} className={`pointer-events-auto rounded-xl border px-4 py-3 text-sm shadow-lg ${toast.kind === 'success' ? 'border-emerald-400/30 bg-emerald-950 text-emerald-100' : 'border-red-400/30 bg-red-950 text-red-100'}`}>
-            {toast.message}
+            <span className="flex items-center justify-between gap-4">
+              {toast.message}
+              {toast.action && (
+                <button
+                  onClick={() => {
+                    dismiss(toast.id);
+                    toast.action!.onClick();
+                  }}
+                  className="shrink-0 rounded-full border border-current px-3 py-1 text-xs font-semibold transition hover:bg-white/10"
+                >
+                  {toast.action.label}
+                </button>
+              )}
+            </span>
           </div>
         ))}
       </div>

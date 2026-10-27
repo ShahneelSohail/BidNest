@@ -10,7 +10,7 @@ categoryRouter.get(
     const now = new Date();
     const categories = await prisma.category.findMany({
       where: { isActive: true },
-      orderBy: { name: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: { _count: { select: { items: { where: { status: 'ACTIVE', endDate: { gt: now } } } } } },
     });
 
