@@ -162,3 +162,28 @@ test('an admin can undo an approval and reorder categories', async ({ browser })
   await admin.getByRole('button', { name: `Move ${rootName} up` }).click();
   await expect(admin.getByText('Order saved.').first()).toBeVisible();
 });
+
+test('a winner pays for a lot through the demo checkout and gets a receipt', async ({ browser }) => {
+  const itemId = await createLiveItem(browser, `E2E checkout lot ${Date.now()}`);
+  const buyer = await apiLogin(browser, 'ivy@bidnest.test');
+  const bid = await buyer.request.post(`/api/items/${itemId}/bids`, { data: { amount: 25 } });
+  expect(bid.status()).toBe(201);
+  const seller = await apiLogin(browser, 'omar@bidnest.test');
+  expect((await seller.request.post(`/api/seller/items/${itemId}/expire`)).ok()).toBe(true);
+
+  const page = await buyer.newPage();
+  await page.goto(`/checkout/${itemId}`);
+  await expect(page.getByRole('radio', { name: /Home/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Continue to payment' }).click();
+
+  await page.getByLabel('Card number').fill('4242424242424242');
+  await page.getByLabel('Expiry').fill('1234');
+  await page.getByLabel('Security code').fill('123');
+  await page.getByLabel('Name on card').fill('Ivy Okafor');
+  await page.getByRole('button', { name: 'Continue to review' }).click();
+  await page.getByRole('button', { name: /^Pay \$/ }).click();
+
+  await expect(page.getByText('Payment received').first()).toBeVisible();
+  await expect(page.getByText(/BN-\d{6}/).first()).toBeVisible();
+  await expect(page.getByText('Visa ending 4242').first()).toBeVisible();
+});

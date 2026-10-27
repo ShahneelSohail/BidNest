@@ -17,12 +17,14 @@ import { meRouter } from './modules/me/me.routes';
 import { sellerRouter } from './modules/seller/seller.routes';
 import { statsRouter } from './modules/stats/stats.routes';
 import { userRouter } from './modules/users/user.routes';
+import { stripeWebhook } from './modules/webhooks/stripe.webhook';
 
 export const createApp = () => {
   const app = express();
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cors({ origin: corsOrigins, credentials: true }));
+  app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhook);
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
   if (env.NODE_ENV !== 'test') app.use(morgan('dev'));

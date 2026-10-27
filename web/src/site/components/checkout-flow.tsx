@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import { formatShortDate } from '../lib/time';
@@ -184,6 +185,12 @@ const CheckoutLot = ({ lot }: { lot: WonLot }) => {
   const [card, setCard] = useState(() => emptyCard(user?.fullName ?? ''));
   const [showErrors, setShowErrors] = useState(false);
   const [payment, setPayment] = useState<Payment>();
+  const config = useQuery({ queryKey: ['payment-config'], queryFn: () => api.get<{ mode: 'demo' | 'stripe' }>('/me/payment-config') });
+  const startStripe = useMutation({
+    mutationFn: (body: { addressId: number; delivery: DeliveryOption['key'] }) => api.post<{ url: string }>(`/me/won/${lot.id}/checkout-session`, body),
+    onSuccess: ({ url }) => window.location.assign(url),
+    onError: error => toast('error', error.message),
+  });
   const pay = useMutation({
     mutationFn: (body: { addressId: number; delivery: DeliveryOption['key']; payment: Payment }) => api.post(`/me/won/${lot.id}/checkout`, body),
     onSuccess: () => {
@@ -193,31 +200,35 @@ const CheckoutLot = ({ lot }: { lot: WonLot }) => {
     onError: error => toast('error', error.message),
   });
 
-  if (addresses.isPending || options.isPending) return <Spinner />;
-  if (addresses.error || options.error) return <ErrorState message={(addresses.error ?? options.error)?.message ?? 'Could not load checkout.'} />;
+  if (addresses.isPending || options.isPending || config.isPending) return <Spinner />;
+  if (addresses.error || options.error || config.error) return <ErrorState message={(addresses.error ?? options.error ?? config.error)?.message ?? 'Could not load checkout.'} />;
+  const hosted = config.data.mode === 'stripe';
 
   const address = addresses.data.find(entry => entry.id === addressId) ?? addresses.data[0];
   const delivery = options.data.find(option => option.key === deliveryKey) ?? options.data[0];
   const lastStep = stepLabels.length - 1;
+  const busy = pay.isPending || startStripe.isPending;
   const goTo = (target: number) => {
     setStep(target);
     pay.reset();
   };
 
   const next = () => {
-    if (step === 1) {
+    if (step === 1 && !hosted) {
       const brand = cardBrand(card.number);
       if (!brand || Object.keys(cardErrors(card)).length) return setShowErrors(true);
       setPayment({ brand, last4: cardLast4(card.number) });
     }
     if (step < lastStep) return goTo(step + 1);
-    if (address && payment) pay.mutate({ addressId: address.id, delivery: delivery.key, payment });
+    if (!address) return;
+    if (hosted) startStripe.mutate({ addressId: address.id, delivery: delivery.key });
+    else if (payment) pay.mutate({ addressId: address.id, delivery: delivery.key, payment });
   };
 
   const reviewRows = [
     { label: 'Ship to', value: address ? formatAddress(address) : '', target: 0 },
     { label: 'Delivery', value: `${delivery.label} · ${delivery.detail.split(',')[0]} · ${formatMoney(delivery.cost)}`, target: 0 },
-    { label: 'Payment', value: payment ? `${payment.brand} ending ${payment.last4}` : '', target: 1 },
+    { label: 'Payment', value: hosted ? 'Card, paid securely on Stripe' : payment ? `${payment.brand} ending ${payment.last4}` : '', target: 1 },
   ];
   const total = lot.currentPrice + delivery.cost;
 
@@ -252,12 +263,18 @@ const CheckoutLot = ({ lot }: { lot: WonLot }) => {
           {step === 1 && (
             <div className="flex flex-col gap-5">
               <h2 className="display text-3xl">Pay with card</h2>
-              <CardForm values={card} onChange={setCard} showErrors={showErrors} />
+              {!hosted && <CardForm values={card} onChange={setCard} showErrors={showErrors} />}
               <p className="flex items-start gap-2.5 border border-gold-300/25 bg-gold-300/5 px-4 py-3 text-[13px] leading-normal text-text-2">
                 <Icon name="shield" size={16} className="mt-0.5 flex-none text-gold-300" />
+                {hosted ? (
+                  <span>
+                    <b className="font-semibold text-text">Secure card payment.</b> You will enter your card on Stripe&apos;s own page. BidNest never sees or stores your card details.
+                  </span>
+                ) : (
                 <span>
                   <b className="font-semibold text-text">Demo payment.</b> No card is charged. Only the card brand and the last 4 digits are sent to BidNest; the full number, expiry and security code never leave this page. Saved cards and bank transfer are not available yet.
                 </span>
+                )}
               </p>
             </div>
           )}
@@ -275,18 +292,18 @@ const CheckoutLot = ({ lot }: { lot: WonLot }) => {
                   </div>
                 ))}
               </dl>
-              <p className="text-[13px] leading-relaxed text-muted">By paying you confirm the purchase of {lotNumber(lot.id)}. This is a demo checkout, so no money moves.</p>
+              <p className="text-[13px] leading-relaxed text-muted">By paying you confirm the purchase of {lotNumber(lot.id)}. {hosted ? 'You will be taken to Stripe to pay.' : 'This is a demo checkout, so no money moves.'}</p>
             </div>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-line pt-8">
-          <Button variant="ghost" size="lg" disabled={step === 0 || pay.isPending} onClick={() => goTo(step - 1)}>
+          <Button variant="ghost" size="lg" disabled={step === 0 || busy} onClick={() => goTo(step - 1)}>
             <Icon name="back" size={16} />
             Back
           </Button>
-          <Button variant={step === lastStep ? 'gold' : 'primary'} size="lg" className="tnum" disabled={pay.isPending || (step === 0 && !address)} onClick={next}>
-            {pay.isPending && <span className="size-4 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />}
-            {pay.isPending ? 'Processing payment…' : step === lastStep ? `Pay ${formatMoney(total)}` : `Continue to ${stepLabels[step + 1].toLowerCase()}`}
+          <Button variant={step === lastStep ? 'gold' : 'primary'} size="lg" className="tnum" disabled={busy || (step === 0 && !address)} onClick={next}>
+            {busy && <span className="size-4 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />}
+            {busy ? (hosted ? 'Opening Stripe…' : 'Processing payment…') : step === lastStep ? (hosted ? `Pay ${formatMoney(total)} on Stripe` : `Pay ${formatMoney(total)}`) : `Continue to ${stepLabels[step + 1].toLowerCase()}`}
           </Button>
         </div>
       </div>
@@ -296,8 +313,22 @@ const CheckoutLot = ({ lot }: { lot: WonLot }) => {
 };
 
 const CheckoutPage = ({ itemId }: { itemId: number }) => {
+  const queryClient = useQueryClient();
+  const params = useSearchParams();
+  const sessionId = params.get('session_id');
+  const requested = useRef(false);
   const won = useQuery({ queryKey: ['won'], queryFn: () => api.get<WonLot[]>('/me/won') });
   const lot = won.data?.find(item => item.id === itemId);
+  const confirm = useMutation({
+    mutationFn: (id: string) => api.post(`/me/won/${itemId}/confirm-payment`, { sessionId: id }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['won'] }),
+  });
+
+  useEffect(() => {
+    if (!sessionId || requested.current) return;
+    requested.current = true;
+    confirm.mutate(sessionId);
+  }, [sessionId, confirm]);
 
   return (
     <>
@@ -311,10 +342,12 @@ const CheckoutPage = ({ itemId }: { itemId: number }) => {
           Back to dashboard
         </Link>
       </div>
-      {won.isPending && <Spinner />}
+      {params.get('cancelled') === '1' && <p className="mb-6 border border-outbid/30 bg-outbid/8 px-4 py-3 text-sm text-outbid">Payment cancelled. You have not been charged.</p>}
+      {confirm.error && <ErrorState message={`${confirm.error.message} If you were charged, your receipt will appear here shortly.`} />}
+      {(won.isPending || confirm.isPending) && <Spinner />}
       {won.error && <ErrorState message={won.error.message} />}
       {won.data && !lot && <EmptyState title="We couldn't find that lot" hint="Only the winner of an auction can check out." action={<LinkButton href="/dashboard/won">Back to won items</LinkButton>} />}
-      {lot && (lot.paid ? <Receipt lot={lot} /> : <CheckoutLot lot={lot} />)}
+      {lot && !confirm.isPending && (lot.paid ? <Receipt lot={lot} /> : <CheckoutLot lot={lot} />)}
     </>
   );
 };

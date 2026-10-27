@@ -9,6 +9,9 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
   PUBLIC_API_URL: z.string().default('http://localhost:4000'),
+  WEB_URL: z.string().default('http://localhost:3000'),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

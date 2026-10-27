@@ -1,20 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { asyncHandler, conflict, notFound } from '../../lib/http';
+import { env } from '../../config/env';
+import { asyncHandler, badRequest, forbidden, notFound } from '../../lib/http';
 import { prisma } from '../../lib/prisma';
 import { money } from '../../lib/serialize';
+import { getStripe, isStripeConfigured } from '../../lib/stripe';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
-import { notify } from '../notifications/notification.service';
-import { wonWhere } from './won';
-
-const DELIVERY_OPTIONS = {
-  standard: { label: 'Insured courier', detail: '3–5 business days, signature on delivery', cost: 85 },
-  express: { label: 'Express insured', detail: '1–2 business days, priority handling', cost: 140 },
-} as const;
-
-type DeliveryKey = keyof typeof DELIVERY_OPTIONS;
-const deliveryKeys = Object.keys(DELIVERY_OPTIONS) as [DeliveryKey, ...DeliveryKey[]];
+import { imageUrl } from '../items/item.dto';
+import { DELIVERY_OPTIONS, deliveryKeys, finalizePaidSession, loadCheckoutContext, placeOrder } from './order.service';
 
 const idParams = z.object({ id: z.coerce.number().int().positive() });
 const text = (label: string, max = 120) => z.string().trim().min(1, `${label} is required`).max(max);
@@ -30,16 +24,23 @@ const addressSchema = z.object({
   country: text('Country'),
 });
 
+const shippingChoice = { addressId: z.coerce.number().int().positive(), delivery: z.enum(deliveryKeys) };
+
 const checkoutSchema = z.object({
-  addressId: z.coerce.number().int().positive(),
-  delivery: z.enum(deliveryKeys),
+  ...shippingChoice,
   payment: z.object({ brand: z.enum(['Visa', 'Mastercard', 'Amex']), last4: z.string().regex(/^\d{4}$/, 'Enter the last 4 digits of the card') }),
 });
+const sessionSchema = z.object(shippingChoice);
+const confirmSchema = z.object({ sessionId: z.string().min(1) });
 
-const receiptNumber = (orderId: number) => `BN-${String(orderId).padStart(6, '0')}`;
+const toCents = (amount: number) => Math.round(amount * 100);
 
 export const checkoutRouter = Router();
 checkoutRouter.use(requireAuth);
+
+checkoutRouter.get('/payment-config', (_req, res) => {
+  res.json({ data: { mode: isStripeConfigured() ? 'stripe' : 'demo' } });
+});
 
 checkoutRouter.get('/delivery-options', (_req, res) => {
   res.json({ data: Object.entries(DELIVERY_OPTIONS).map(([key, option]) => ({ key, ...option })) });
@@ -88,36 +89,58 @@ checkoutRouter.post(
   validate('params', idParams),
   validate('body', checkoutSchema),
   asyncHandler(async (req, res) => {
+    if (isStripeConfigured()) throw forbidden('Card payments are handled by Stripe. Use the secure checkout.');
     const { id } = req.params as unknown as z.infer<typeof idParams>;
     const { addressId, delivery, payment } = req.body as z.infer<typeof checkoutSchema>;
     const userId = currentUser(req).id;
-    const item = await prisma.item.findFirst({ where: { id, ...wonWhere(userId) } });
-    if (!item) throw notFound('Won auction not found.');
-    if (item.paidAt) throw conflict('This auction has already been paid.');
-    const address = await prisma.address.findFirst({ where: { id: addressId, userId } });
-    if (!address) throw notFound('Choose a delivery address.');
-
-    const { cost } = DELIVERY_OPTIONS[delivery];
-    const itemPrice = Number(item.currentPrice);
-    const order = await prisma.$transaction(async tx => {
-      await tx.item.update({ where: { id }, data: { paidAt: new Date() } });
-      const created = await tx.order.create({
-        data: {
-          itemId: id,
-          buyerId: userId,
-          receiptNo: `PENDING-${id}`,
-          shippingTo: { label: address.label, name: address.name, line1: address.line1, line2: address.line2, city: address.city, region: address.region, postal: address.postal, country: address.country },
-          deliveryMethod: DELIVERY_OPTIONS[delivery].label,
-          itemPrice,
-          shippingCost: cost,
-          total: itemPrice + cost,
-          paymentLabel: `${payment.brand} ending ${payment.last4}`,
-        },
-      });
-      return tx.order.update({ where: { id: created.id }, data: { receiptNo: receiptNumber(created.id) } });
-    });
-    await notify({ userId: item.sellerId, title: 'Payment received', message: `The buyer paid $${Number(order.total).toFixed(2)} for "${item.title}". Ship within 3 business days.`, link: `/auctions/${id}` });
+    const context = await loadCheckoutContext(id, userId, addressId, delivery);
+    const order = await placeOrder({ ...context, userId, paymentLabel: `${payment.brand} ending ${payment.last4}` });
     res.status(201).json({ data: { id, receiptNo: order.receiptNo, paidAt: order.paidAt, amount: money(order.total) } });
+  })
+);
+
+checkoutRouter.post(
+  '/won/:id/checkout-session',
+  validate('params', idParams),
+  validate('body', sessionSchema),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as unknown as z.infer<typeof idParams>;
+    const { addressId, delivery } = req.body as z.infer<typeof sessionSchema>;
+    const userId = currentUser(req).id;
+    const stripe = getStripe();
+    const { item, delivery: shipping } = await loadCheckoutContext(id, userId, addressId, delivery);
+
+    const image = await prisma.itemImage.findFirst({ where: { itemId: id, isPrimary: true } });
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      client_reference_id: String(id),
+      customer_email: currentUser(req).email,
+      line_items: [
+        { quantity: 1, price_data: { currency: 'usd', unit_amount: toCents(Number(item.currentPrice)), product_data: { name: item.title, images: image && image.url.startsWith('http') ? [image.url] : image ? [imageUrl(image.url)] : [] } } },
+        { quantity: 1, price_data: { currency: 'usd', unit_amount: toCents(shipping.cost), product_data: { name: shipping.label } } },
+      ],
+      metadata: { itemId: String(id), userId: String(userId), addressId: String(addressId), delivery },
+      success_url: `${env.WEB_URL}/checkout/${id}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${env.WEB_URL}/checkout/${id}?cancelled=1`,
+    });
+    if (!session.url) throw badRequest('Could not start the payment. Please try again.');
+    res.status(201).json({ data: { url: session.url } });
+  })
+);
+
+checkoutRouter.post(
+  '/won/:id/confirm-payment',
+  validate('params', idParams),
+  validate('body', confirmSchema),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as unknown as z.infer<typeof idParams>;
+    const userId = currentUser(req).id;
+    const session = await getStripe().checkout.sessions.retrieve((req.body as z.infer<typeof confirmSchema>).sessionId);
+    if (Number(session.metadata?.itemId) !== id || Number(session.metadata?.userId) !== userId) throw notFound('Payment not found.');
+
+    const order = await finalizePaidSession(session);
+    if (!order) throw badRequest('This payment has not completed yet.');
+    res.json({ data: { id, receiptNo: order.receiptNo, paidAt: order.paidAt, amount: money(order.total) } });
   })
 );
 
