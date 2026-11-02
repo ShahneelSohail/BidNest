@@ -19,11 +19,12 @@ import { Avatar, cx, EmptyState, LinkButton, Skeleton, StatusBadge } from './ui'
 const MAX_VISIBLE_BIDS = 10;
 const SIMILAR_COUNT = 4;
 
-const useLiveAuction = (itemId: number, userId: number | undefined) => {
+const useLiveAuction = (itemId: number, userId: number | undefined, authResolved: boolean) => {
   const queryClient = useQueryClient();
   const key = ['item', itemId];
 
   useEffect(() => {
+    if (!authResolved) return;
     let cancelled = false;
     let leave: () => void = () => undefined;
 
@@ -44,7 +45,7 @@ const useLiveAuction = (itemId: number, userId: number | undefined) => {
       if (event.itemId === itemId) void queryClient.invalidateQueries({ queryKey: key });
     };
 
-    void getSocket().then(socket => {
+    void getSocket(userId !== undefined).then(socket => {
       if (cancelled) return;
       socket.emit('auction:join', { itemId });
       socket.on('bid:placed', onBid);
@@ -59,7 +60,7 @@ const useLiveAuction = (itemId: number, userId: number | undefined) => {
       cancelled = true;
       leave();
     };
-  }, [itemId, userId, queryClient]);
+  }, [itemId, userId, authResolved, queryClient]);
 };
 
 const badgeStyles: Record<Urgency, { label: string; style: string }> = {
@@ -200,11 +201,11 @@ const DetailSkeleton = () => (
 const closedBadgeLabels = { winning: 'Winner', 'no-bids': 'Expired' } as const;
 
 export const AuctionDetail = ({ itemId }: { itemId: number }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
   const item = useQuery({ queryKey: ['item', itemId], queryFn: () => api.get<ItemDetail>(`/items/${itemId}`) });
-  useLiveAuction(itemId, user?.id);
+  useLiveAuction(itemId, user?.id, !loading);
 
   const toggleWatch = useMutation({
     mutationFn: (watching: boolean) => (watching ? api.delete(`/items/${itemId}/watch`) : api.put(`/items/${itemId}/watch`)),

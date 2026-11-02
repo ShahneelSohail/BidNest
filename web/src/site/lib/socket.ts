@@ -3,10 +3,10 @@ import { api } from './api';
 
 let socket: Socket | null = null;
 
-export const getSocket = async (): Promise<Socket> => {
+export const getSocket = async (signedIn: boolean): Promise<Socket> => {
   if (socket) return socket;
   const url = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-  const token = await api.get<{ token: string }>('/auth/socket-token').then(result => result.token).catch(() => null);
+  const token = signedIn ? await api.get<{ token: string }>('/auth/socket-token').then(result => result.token).catch(() => null) : null;
   socket = io(url, { transports: ['websocket'], auth: token ? { token } : {} });
   return socket;
 };

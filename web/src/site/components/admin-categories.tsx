@@ -223,7 +223,7 @@ const Manager = ({ categories }: { categories: AdminCategory[] }) => {
   });
 
   return (
-    <div className="grid items-start gap-12 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-12 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex flex-col gap-6">
         <AdminTitle
           eyebrow={`Taxonomy · ${subcategories} subcategories · ${plural(totalLots, 'lot')}`}
