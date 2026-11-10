@@ -84,7 +84,7 @@ export const AdminOverview = () => {
             <div className="grid items-end gap-8 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))]">
               <div className="border-t border-gold-300/45 pt-[18px] sm:col-span-2 xl:col-span-1">
                 <Eyebrow className="text-muted!">Revenue · sold lots</Eyebrow>
-                <p className="display gold-text tnum mt-3 mb-2 text-6xl leading-[0.95] md:text-[80px]">{formatMoney(stats.totalRevenue)}</p>
+                <p className="display gold-text tnum mt-3 mb-2 text-6xl leading-[0.95] md:text-[80px] xl:text-[52px]">{formatMoney(stats.totalRevenue)}</p>
                 <p className="text-[13px] text-muted">{stats.soldItems} lots sold</p>
               </div>
               {kpis.map(kpi => (
