@@ -1,4 +1,6 @@
-# BidNest
+<h1 align="center">
+  <img src="docs/logo.webp" alt="BidNest" width="720">
+</h1>
 
 An online auction platform where sellers list items, buyers bid in real time, and administrators approve and moderate listings.
 
