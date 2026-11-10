@@ -4,6 +4,28 @@ An online auction platform where sellers list items, buyers bid in real time, an
 
 > **Status:** the overhaul is complete: a Next.js and TypeScript front end, an Express, Prisma and PostgreSQL API, and live bidding over Socket.io. The original ASP.NET Core application, built as a team project at Aptech, is kept in [`legacy/`](legacy).
 
+![Landing page](docs/screenshots/landing.webp)
+
+## Screens
+
+| | |
+|---|---|
+| ![Browse auctions](docs/screenshots/auctions.webp) | ![Live auction page](docs/screenshots/auction.webp) |
+| **Browse**: search, filters and live countdowns | **Auction page**: live bids, automatic bidding and the bid ledger |
+| ![Buyer dashboard](docs/screenshots/dashboard.webp) | ![Checkout](docs/screenshots/checkout.webp) |
+| **Buyer dashboard**: bids, wins, watchlist and payments due | **Checkout**: address, delivery and Stripe or demo payment |
+| ![Seller dashboard](docs/screenshots/sell.webp) | ![New listing](docs/screenshots/sell-new.webp) |
+| **Seller dashboard**: earnings, views and listing status | **New listing**: photos, draft and submit for approval |
+| ![Admin console](docs/screenshots/admin.webp) | ![Approvals queue](docs/screenshots/admin-approvals.webp) |
+| **Admin console**: live stats and activity | **Approvals**: approve or reject, with a one-minute undo |
+
+On a phone the same pages reflow without sideways scrolling:
+
+<p>
+  <img src="docs/screenshots/mobile-auctions.webp" alt="Auctions on a phone" width="240">
+  <img src="docs/screenshots/mobile-auction.webp" alt="An auction on a phone" width="240">
+</p>
+
 ## The overhaul
 
 | Part | Stack |
@@ -83,15 +105,9 @@ The end-to-end tests sign in through the development-only quick login, so run th
 
 ## Credits
 
-| Contributor | Part in this repository (from the commit history) |
-|---|---|
-| **S A M E E R** ([Konete326](https://github.com/Konete326), original repository: [Konete326/BidNest](https://github.com/Konete326/BidNest)) | Original author of the application: project structure, models, authentication, categories, items, admin and user panels, the bidding system, UI themes, documentation and the presentation. 10 of the 13 commits. |
-| **Shahneel Sohail** (commits as `shahneel` and `Neel455`) | The UI redesign ("Complete UI change") and the React landing page ("Landing page added"). |
-| **zahashakirali** | A bug-fix commit ("error solve"). |
-
 ### Landing page
 
-The landing page is built with React, Vite, Tailwind CSS, GSAP and three.js. It is adapted from the **JavaScript Mastery** tutorial "Stunning GSAP Cocktail Website" by Adrian Hajdin, then rebranded and extended for BidNest by Shahneel Sohail: new hero, sections, 3D scenes, content and styling.
+The landing page is built with React, Vite, Tailwind CSS, GSAP and three.js. It is adapted from the **JavaScript Mastery** tutorial "Stunning GSAP Cocktail Website" by Adrian Hajdin, then rebranded and extended for BidNest: new hero, sections, 3D scenes, content and styling.
 
 ### Third-party assets
 
