@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
 import type { User } from '../lib/types';
 import { AuthArt } from './auth-art';
 import { useAuth } from './Providers';
@@ -73,15 +71,20 @@ const StrengthMeter = ({ password }: { password: string }) => {
   );
 };
 
-const devAccounts = [
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
+
+const demoAccounts = [
   { label: 'Admin', email: 'admin@bidnest.test' },
   { label: 'Maya', email: 'maya@bidnest.test' },
   { label: 'Omar', email: 'omar@bidnest.test' },
+  { label: 'Lena', email: 'lena@bidnest.test' },
+  { label: 'Noah', email: 'noah@bidnest.test' },
+  { label: 'Ivy', email: 'ivy@bidnest.test' },
+  { label: 'Kai', email: 'kai@bidnest.test' },
 ];
 
 export const AuthForm = ({ mode }: { mode: Mode }) => {
   const { login, register } = useAuth();
-  const queryClient = useQueryClient();
   const router = useRouter();
   const next = useSearchParams().get('next');
   const [values, setValues] = useState<Values>({});
@@ -94,26 +97,23 @@ export const AuthForm = ({ mode }: { mode: Mode }) => {
   const errors = Object.fromEntries(fields.map(field => [field.name, touched ? field.validate(values[field.name] ?? '', mode) : null]));
   const hasErrors = fields.some(field => field.validate(values[field.name] ?? '', mode));
 
-  const devLogin = async (email: string) => {
-    const user = await api.post<User>('/auth/dev-login', { email });
-    queryClient.clear();
-    queryClient.setQueryData(['me'], user);
-    router.replace(user.role === 'ADMIN' ? '/admin' : '/dashboard');
-  };
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setTouched(true);
+  const authenticate = async (action: () => Promise<User>) => {
     setError(null);
-    if (hasErrors) return;
     setSubmitting(true);
     try {
-      const user = mode === 'login' ? await login({ email: values.email!, password: values.password! }) : await register({ email: values.email!, password: values.password!, username: values.username!, fullName: values.fullName! });
+      const user = await action();
       router.replace(next?.startsWith('/') ? next : user.role === 'ADMIN' ? '/admin' : '/dashboard');
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Something went wrong.');
       setSubmitting(false);
     }
+  };
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setTouched(true);
+    if (hasErrors) return;
+    return authenticate(() => (mode === 'login' ? login({ email: values.email!, password: values.password! }) : register({ email: values.email!, password: values.password!, username: values.username!, fullName: values.fullName! })));
   };
 
   return (
@@ -182,11 +182,11 @@ export const AuthForm = ({ mode }: { mode: Mode }) => {
             </Button>
           </form>
 
-          {mode === 'login' && process.env.NODE_ENV === 'development' && (
+          {mode === 'login' && DEMO_PASSWORD && (
             <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-line pt-5 text-sm text-muted">
-              Dev quick login:
-              {devAccounts.map(account => (
-                <Button key={account.email} type="button" variant="secondary" size="sm" onClick={() => devLogin(account.email)}>
+              Demo · try a role:
+              {demoAccounts.map(account => (
+                <Button key={account.email} type="button" variant="secondary" size="sm" disabled={submitting} onClick={() => authenticate(() => login({ email: account.email, password: DEMO_PASSWORD }))}>
                   {account.label}
                 </Button>
               ))}
