@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b1814"/><stop offset="1" stop-color="#050505"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".42" r=".5"><stop offset="0" stop-color="#d8b25c" stop-opacity=".34"/><stop offset="1" stop-color="#d8b25c" stop-opacity="0"/></radialGradient>
+    <linearGradient id="silver" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#9a9a9a"/></linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect width="800" height="600" fill="url(#glow)"/>
+  <rect x="24" y="24" width="752" height="552" rx="6" fill="none" stroke="#d8b25c" stroke-opacity=".35" stroke-width="2"/>
+  <g><path d="M330 200h140v90H330z" fill="none" stroke="#d8b25c" stroke-width="10" stroke-linejoin="round"/><path d="M310 290h180v40H310zM330 330v70M470 330v70" fill="none" stroke="#d8b25c" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <text x="400" y="505" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="38" font-weight="700" fill="url(#silver)">Mid-century Teak Armchair</text>
+  <text x="400" y="545" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" letter-spacing="6" fill="#d8b25c">BIDNEST</text>
+</svg>
